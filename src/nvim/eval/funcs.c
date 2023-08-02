@@ -3070,6 +3070,8 @@ static void f_has(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 #ifdef HAVE_ACL
     "acl",
 #endif
+    "android",
+    "termux",
     "autochdir",
     "arabic",
     "autocmd",
