@@ -4421,28 +4421,28 @@ char *check_nextcmd(char *p)
 /// @return  FAIL and give error message if 'message' true, return OK otherwise
 static int check_more(int message, bool forceit)
 {
-  int n = ARGCOUNT - curwin->w_arg_idx - 1;
-
-  if (!forceit && only_one_window()
-      && ARGCOUNT > 1 && !arg_had_last && n > 0 && quitmore == 0) {
-    if (message) {
-      if ((p_confirm || (cmdmod.cmod_flags & CMOD_CONFIRM)) && curbuf->b_fname != NULL) {
-        char buff[DIALOG_MSG_SIZE];
-
-        vim_snprintf(buff, DIALOG_MSG_SIZE,
-                     NGETTEXT("%d more file to edit.  Quit anyway?",
-                              "%d more files to edit.  Quit anyway?", n), n);
-        if (vim_dialog_yesno(VIM_QUESTION, NULL, buff, 1) == VIM_YES) {
-          return OK;
-        }
-        return FAIL;
-      }
-      semsg(NGETTEXT("E173: %" PRId64 " more file to edit",
-                     "E173: %" PRId64 " more files to edit", n), (int64_t)n);
-      quitmore = 2;                 // next try to quit is allowed
-    }
-    return FAIL;
-  }
+  // int n = ARGCOUNT - curwin->w_arg_idx - 1;
+  //
+  // if (!forceit && only_one_window()
+  //     && ARGCOUNT > 1 && !arg_had_last && n > 0 && quitmore == 0) {
+  //   if (message) {
+  //     if ((p_confirm || (cmdmod.cmod_flags & CMOD_CONFIRM)) && curbuf->b_fname != NULL) {
+  //       char buff[DIALOG_MSG_SIZE];
+  //
+  //       vim_snprintf(buff, DIALOG_MSG_SIZE,
+  //                    NGETTEXT("%d more file to edit.  Quit anyway?",
+  //                             "%d more files to edit.  Quit anyway?", n), n);
+  //       if (vim_dialog_yesno(VIM_QUESTION, NULL, buff, 1) == VIM_YES) {
+  //         return OK;
+  //       }
+  //       return FAIL;
+  //     }
+  //     semsg(NGETTEXT("E173: %" PRId64 " more file to edit",
+  //                    "E173: %" PRId64 " more files to edit", n), (int64_t)n);
+  //     quitmore = 2;                 // next try to quit is allowed
+  //   }
+  //   return FAIL;
+  // }
   return OK;
 }
 
