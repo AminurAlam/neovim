@@ -6375,7 +6375,7 @@ static void nv_record(cmdarg_T *cap)
     return;
   }
 
-  if (cap->nchar == ':' || cap->nchar == '/' || cap->nchar == '?') {
+  if (cap->nchar == '/' || cap->nchar == '?') {
     if (cmdwin_type != 0) {
       emsg(_(e_cmdline_window_already_open));
       return;
