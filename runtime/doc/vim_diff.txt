@@ -37,6 +37,7 @@ Defaults					            *nvim-defaults*
 - 'backspace' defaults to "indent,eol,start"
 - 'backupdir' defaults to .,~/.local/state/nvim/backup// (|xdg|), auto-created
 - 'belloff' defaults to "all"
+- 'comments' includes "fb:•"
 - 'commentstring' defaults to ""
 - 'compatible' is always disabled
 - 'complete' excludes "i"
@@ -115,13 +116,15 @@ DEFAULT MAPPINGS
 Nvim creates the following default mappings at |startup|. You can disable any
 of these in your config by simply removing the mapping, e.g. ":unmap Y".
 
-- |Y-default|
-- |i_CTRL-U-default|
-- |i_CTRL-W-default|
-- |CTRL-L-default|
-- |&-default|
-- |v_#-default|
-- |v_star-default|
+- Y |Y-default|
+- <C-U> |i_CTRL-U-default|
+- <C-W> |i_CTRL-W-default|
+- <C-L> |CTRL-L-default|
+- & |&-default|
+- # |v_#-default|
+- * |v_star-default|
+- Nvim LSP client defaults |lsp-defaults|
+  - K |K-lsp-default|
 
 DEFAULT AUTOCOMMANDS
 							*default-autocmds*
@@ -130,6 +133,8 @@ remove them and ":autocmd {group}" to see how they're defined.
 
 nvim_terminal:
 - BufReadCmd: Treats "term://" buffers as |terminal| buffers. |terminal-start|
+- TermClose: A |terminal| buffer started with no arguments (which thus uses
+  'shell') and which exits with no error is closed automatically.
 
 nvim_cmdwin:
 - CmdwinEnter: Limits syntax sync to maxlines=1 in the |cmdwin|.
@@ -452,7 +457,7 @@ coerced to strings. See |id()| for more details, currently it uses
 
 |c_CTRL-R| pasting a non-special register into |cmdline| omits the last <CR>.
 
-|CursorMoved| always triggers when moving between windows.
+|CursorMoved| triggers when moving between windows.
 
 Lua interface (|lua.txt|):
 
@@ -464,7 +469,7 @@ Lua interface (|lua.txt|):
 <  whereas Vim emits only "TEST".
 - Lua has direct access to Nvim |API| via `vim.api`.
 - Lua package.path and package.cpath are automatically updated according to
-  'runtimepath': |lua-require|.
+  'runtimepath'. |lua-module-load|
 
 Commands:
   |:doautocmd| does not warn about "No matching autocommands".
@@ -510,6 +515,9 @@ Mappings:
 
 Motion:
   The |jumplist| avoids useless/phantom jumps.
+
+Performance:
+  Folds are not updated during insert-mode.
 
 Syntax highlighting:
   syncolor.vim has been removed. Nvim now sets up default highlighting groups
@@ -731,9 +739,6 @@ Options:
   *'ttyscroll'* *'tsl'*
   *'ttytype'* *'tty'*
   weirdinvert
-
-Performance:
-  Folds are not updated during insert-mode.
 
 Plugins:
 
