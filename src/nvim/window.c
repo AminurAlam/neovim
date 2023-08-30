@@ -562,7 +562,7 @@ wingotofile:
 
       if (wp != NULL && nchar == 'F' && lnum >= 0) {
         curwin->w_cursor.lnum = lnum;
-        check_cursor_lnum();
+        check_cursor_lnum(curwin);
         beginline(BL_SOL | BL_FIX);
       }
       xfree(ptr);
@@ -5132,8 +5132,8 @@ static win_T *win_alloc(win_T *after, bool hidden)
   new_wp->w_ns_hl = -1;
 
   // use global option for global-local options
-  new_wp->w_p_so = -1;
-  new_wp->w_p_siso = -1;
+  new_wp->w_allbuf_opt.wo_so = new_wp->w_p_so = -1;
+  new_wp->w_allbuf_opt.wo_siso = new_wp->w_p_siso = -1;
 
   // We won't calculate w_fraction until resizing the window
   new_wp->w_fraction = 0;
@@ -5239,8 +5239,9 @@ static void win_free(win_T *wp, tabpage_T *tp)
     }
   }
 
-  // free the border title text
+  // free the border text
   clear_virttext(&wp->w_float_config.title_chunks);
+  clear_virttext(&wp->w_float_config.footer_chunks);
 
   clear_matches(wp);
 
@@ -6465,6 +6466,10 @@ void win_fix_scroll(int resize)
   FOR_ALL_WINDOWS_IN_TAB(wp, curtab) {
     // Skip when window height has not changed or when floating.
     if (!wp->w_floating && wp->w_height != wp->w_prev_height) {
+      // Cursor position in this window may now be invalid.  It is kept
+      // potentially invalid until the window is made the current window.
+      wp->w_do_win_fix_cursor = true;
+
       // If window has moved update botline to keep the same screenlines.
       if (*p_spk == 's' && wp->w_winrow != wp->w_prev_winrow
           && wp->w_botline - 1 <= wp->w_buffer->b_ml.ml_line_count) {
@@ -6488,7 +6493,8 @@ void win_fix_scroll(int resize)
       } else if (wp == curwin) {
         wp->w_valid &= ~VALID_CROW;
       }
-      invalidate_botline_win(wp);
+
+      invalidate_botline(wp);
       validate_botline(wp);
     }
     wp->w_prev_height = wp->w_height;
@@ -6505,18 +6511,21 @@ void win_fix_scroll(int resize)
 
 /// Make sure the cursor position is valid for 'splitkeep'.
 /// If it is not, put the cursor position in the jumplist and move it.
-/// If we are not in normal mode ("normal" is zero), make it valid by scrolling
+/// If we are not in normal mode ("normal" is false), make it valid by scrolling
 /// instead.
-static void win_fix_cursor(int normal)
+static void win_fix_cursor(bool normal)
 {
   win_T *wp = curwin;
 
-  if (skip_win_fix_cursor || wp->w_buffer->b_ml.ml_line_count < wp->w_height) {
+  if (skip_win_fix_cursor
+      || !wp->w_do_win_fix_cursor
+      || wp->w_buffer->b_ml.ml_line_count < wp->w_height_inner) {
     return;
   }
 
+  wp->w_do_win_fix_cursor = false;
   // Determine valid cursor range.
-  linenr_T so = MIN(wp->w_height_inner / 2, get_scrolloff_value(wp));
+  int so = MIN(wp->w_height_inner / 2, get_scrolloff_value(wp));
   linenr_T lnum = wp->w_cursor.lnum;
 
   wp->w_cursor.lnum = wp->w_topline;
@@ -6533,7 +6542,7 @@ static void win_fix_cursor(int normal)
   if (lnum > bot && (wp->w_botline - wp->w_buffer->b_ml.ml_line_count) != 1) {
     nlnum = bot;
   } else if (lnum < top && wp->w_topline != 1) {
-    nlnum = (so == wp->w_height / 2) ? bot : top;
+    nlnum = (so == wp->w_height_inner / 2) ? bot : top;
   }
 
   if (nlnum != 0) {  // Cursor is invalid for current scroll position.
@@ -6658,7 +6667,7 @@ void scroll_to_fraction(win_T *wp, int prev_height)
   }
 
   redraw_later(wp, UPD_SOME_VALID);
-  invalidate_botline_win(wp);
+  invalidate_botline(wp);
 }
 
 void win_set_inner_size(win_T *wp, bool valid_cursor)
@@ -6705,7 +6714,7 @@ void win_set_inner_size(win_T *wp, bool valid_cursor)
     wp->w_lines_valid = 0;
     if (valid_cursor) {
       changed_line_abv_curs_win(wp);
-      invalidate_botline_win(wp);
+      invalidate_botline(wp);
       if (wp == curwin && *p_spk == 'c') {
         curs_columns(wp, true);  // validate w_wrow
       }
@@ -7198,7 +7207,7 @@ int global_stl_height(void)
 /// @param morewin  pretend there are two or more windows if true.
 int last_stl_height(bool morewin)
 {
-  return (p_ls > 1 || (p_ls == 1 && (!one_nonfloat() || morewin))) ? STATUS_HEIGHT : 0;
+  return (p_ls > 1 || (p_ls == 1 && (morewin || !one_nonfloat()))) ? STATUS_HEIGHT : 0;
 }
 
 /// Return the minimal number of rows that is needed on the screen to display

@@ -134,6 +134,18 @@ func Test_undotree_bufnr()
   call assert_notequal(d1, d)
   call assert_equal(d2, d)
 
+  " error cases
+  call assert_fails('call undotree(-1)', 'E158:')
+  call assert_fails('call undotree("nosuchbuf")', 'E158:')
+
+  " after creating a buffer nosuchbuf, undotree('nosuchbuf') should
+  " not error out
+  new nosuchbuf
+  let d = {'seq_last': 0, 'entries': [], 'time_cur': 0, 'save_last': 0, 'synced': 1, 'save_cur': 0, 'seq_cur': 0}
+  call assert_equal(d, undotree("nosuchbuf"))
+  " clean up
+  bw nosuchbuf
+
   " Drop created windows
   set ul&
   new
@@ -387,6 +399,11 @@ endfunc
 
 func Test_undofile_earlier()
   throw 'Skipped: Nvim does not support test_settime()'
+  if has('win32')
+    " FIXME: This test is flaky on MS-Windows.
+    let g:test_is_flaky = 1
+  endif
+
   " Issue #1254
   " create undofile with timestamps older than Vim startup time.
   let t0 = localtime() - 43200

@@ -177,7 +177,6 @@ func Test_scroll_CursorLineNr_update()
   call writefile(lines, filename)
   let buf = RunVimInTerminal('-S '.filename, #{rows: 5, cols: 50})
   call term_sendkeys(buf, "k")
-  call term_wait(buf)
   call VerifyScreenDump(buf, 'Test_winline_rnu', {})
 
   " clean up
@@ -421,12 +420,19 @@ func Test_display_linebreak_breakat()
   new
   vert resize 25
   let _breakat = &breakat
-  setl signcolumn=yes linebreak breakat=) showbreak=+\ 
+  setl signcolumn=yes linebreak breakat=) showbreak=++
   call setline(1, repeat('x', winwidth(0) - 2) .. ')abc')
   let lines = ScreenLines([1, 2], 25)
   let expected = [
           \ '  xxxxxxxxxxxxxxxxxxxxxxx',
-          \ '  + )abc                 '
+          \ '  ++)abc                 ',
+          \ ]
+  call assert_equal(expected, lines)
+  setl breakindent breakindentopt=shift:2
+  let lines = ScreenLines([1, 2], 25)
+  let expected = [
+          \ '  xxxxxxxxxxxxxxxxxxxxxxx',
+          \ '    ++)abc               ',
           \ ]
   call assert_equal(expected, lines)
   %bw!

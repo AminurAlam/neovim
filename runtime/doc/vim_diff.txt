@@ -258,6 +258,7 @@ Highlight groups:
   |hl-NormalFloat| highlights floating window
   |hl-FloatBorder| highlights border of a floating window
   |hl-FloatTitle| highlights title of a floating window
+  |hl-FloatFooter| highlights footer of a floating window
   |hl-NormalNC| highlights non-current windows
   |hl-MsgArea| highlights messages/cmdline area
   |hl-MsgSeparator| highlights separator for scrolled messages
@@ -494,9 +495,9 @@ Highlight groups:
   using |n| or |N|
   |hl-CursorLine| is low-priority unless foreground color is set
   |hl-VertSplit| superseded by |hl-WinSeparator|
-  Highlight groups names are allowed to contain the characters `.` and `@`.
+  Highlight groups names are allowed to contain `@` characters.
   It is an error to define a highlight group with a name that doesn't match
-  the regexp `[a-zA-Z0-9_.@]*` (see |group-name|).
+  the regexp `[a-zA-Z0-9_.@-]*` (see |group-name|).
 
 Macro/|recording| behavior
   Replay of a macro recorded during :lmap produces the same actions as when it
@@ -619,6 +620,7 @@ Eval:
   *v:sizeofpointer*
 
 Events:
+  *SafeStateAgain*
   *SigUSR1* Use |Signal| to detect `SIGUSR1` signal instead.
 
 Highlight groups:

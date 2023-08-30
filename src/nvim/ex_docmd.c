@@ -2411,7 +2411,7 @@ int parse_command_modifiers(exarg_T *eap, const char **errormsg, cmdmod_T *cmod,
 
     char *p = skip_range(eap->cmd, NULL);
     switch (*p) {
-    // When adding an entry, also modify cmd_exists().
+    // When adding an entry, also modify cmdmods[]
     case 'a':
       if (!checkforcmd(&eap->cmd, "aboveleft", 3)) {
         break;
@@ -3051,6 +3051,7 @@ static struct cmdmod {
   { "confirm", 4, false },
   { "filter", 4, false },
   { "hide", 3, false },
+  { "horizontal", 3, false },
   { "keepalt", 5, false },
   { "keepjumps", 5, false },
   { "keepmarks", 3, false },
@@ -5716,7 +5717,7 @@ static void ex_sleep(exarg_T *eap)
     setcursor_mayforce(true);
   }
 
-  linenr_T len = eap->line2;
+  int64_t len = eap->line2;
   switch (*eap->arg) {
   case 'm':
     break;
@@ -5880,7 +5881,7 @@ static void ex_copymove(exarg_T *eap)
   } else {
     ex_copy(eap->line1, eap->line2, n);
   }
-  u_clearline();
+  u_clearline(curbuf);
   beginline(BL_SOL | BL_FIX);
   ex_may_print(eap);
 }
@@ -7301,12 +7302,31 @@ void set_pressedreturn(bool val)
 static void ex_terminal(exarg_T *eap)
 {
   char ex_cmd[1024];
+  size_t len = 0;
+
+  if (cmdmod.cmod_tab > 0 || cmdmod.cmod_split != 0) {
+    bool multi_mods = false;
+
+    // ex_cmd must be a null terminated string before passing to add_win_cmd_modifiers
+    ex_cmd[0] = '\0';
+
+    len = add_win_cmd_modifiers(ex_cmd, &cmdmod, &multi_mods);
+    assert(len < sizeof(ex_cmd));
+    int result = snprintf(ex_cmd + len, sizeof(ex_cmd) - len, " new");
+    assert(result > 0);
+    len += (size_t)result;
+  } else {
+    int result = snprintf(ex_cmd, sizeof(ex_cmd), "enew%s", eap->forceit ? "!" : "");
+    assert(result > 0);
+    len += (size_t)result;
+  }
+
+  assert(len < sizeof(ex_cmd));
 
   if (*eap->arg != NUL) {  // Run {cmd} in 'shell'.
     char *name = vim_strsave_escaped(eap->arg, "\"\\");
-    snprintf(ex_cmd, sizeof(ex_cmd),
-             ":enew%s | call termopen(\"%s\")",
-             eap->forceit ? "!" : "", name);
+    snprintf(ex_cmd + len, sizeof(ex_cmd) - len,
+             " | call termopen(\"%s\")", name);
     xfree(name);
   } else {  // No {cmd}: run the job with tokenized 'shell'.
     if (*p_sh == NUL) {
@@ -7326,9 +7346,8 @@ static void ex_terminal(exarg_T *eap)
     }
     shell_free_argv(argv);
 
-    snprintf(ex_cmd, sizeof(ex_cmd),
-             ":enew%s | call termopen([%s])",
-             eap->forceit ? "!" : "", shell_argv + 1);
+    snprintf(ex_cmd + len, sizeof(ex_cmd) - len,
+             " | call termopen([%s])", shell_argv + 1);
   }
 
   do_cmdline_cmd(ex_cmd);
