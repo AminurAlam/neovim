@@ -10,14 +10,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "auto/config.h"
+#include "nvim/api/private/converter.h"
 #include "nvim/api/private/defs.h"
+#include "nvim/api/private/helpers.h"
 #include "nvim/ascii.h"
 #include "nvim/buffer.h"
 #include "nvim/buffer_defs.h"
 #include "nvim/channel.h"
 #include "nvim/charset.h"
+#include "nvim/cmdexpand_defs.h"
 #include "nvim/cmdhist.h"
 #include "nvim/cursor.h"
 #include "nvim/edit.h"
@@ -28,7 +32,6 @@
 #include "nvim/eval/typval.h"
 #include "nvim/eval/userfunc.h"
 #include "nvim/eval/vars.h"
-#include "nvim/event/loop.h"
 #include "nvim/event/multiqueue.h"
 #include "nvim/event/process.h"
 #include "nvim/ex_cmds.h"
@@ -58,7 +61,7 @@
 #include "nvim/msgpack_rpc/channel_defs.h"
 #include "nvim/ops.h"
 #include "nvim/option.h"
-#include "nvim/option_defs.h"
+#include "nvim/option_vars.h"
 #include "nvim/optionstr.h"
 #include "nvim/os/fileio.h"
 #include "nvim/os/fs_defs.h"
@@ -947,38 +950,42 @@ int skip_expr(char **pp, evalarg_T *const evalarg)
   return res;
 }
 
+/// Convert "tv" to a string.
+///
+/// @param convert  when true convert a List into a sequence of lines.
+///
+/// @return  an allocated string.
+static char *typval2string(typval_T *tv, bool convert)
+{
+  if (convert && tv->v_type == VAR_LIST) {
+    garray_T ga;
+    ga_init(&ga, (int)sizeof(char), 80);
+    if (tv->vval.v_list != NULL) {
+      tv_list_join(&ga, tv->vval.v_list, "\n");
+      if (tv_list_len(tv->vval.v_list) > 0) {
+        ga_append(&ga, NL);
+      }
+    }
+    ga_append(&ga, NUL);
+    return (char *)ga.ga_data;
+  }
+  return xstrdup(tv_get_string(tv));
+}
+
 /// Top level evaluation function, returning a string.
 ///
-/// @param convert  when true convert a List into a sequence of lines and convert
-///                 a Float to a String.
+/// @param convert  when true convert a List into a sequence of lines.
 ///
-/// @return         pointer to allocated memory, or NULL for failure.
+/// @return  pointer to allocated memory, or NULL for failure.
 char *eval_to_string(char *arg, bool convert)
 {
   typval_T tv;
   char *retval;
-  garray_T ga;
 
   if (eval0(arg, &tv, NULL, &EVALARG_EVALUATE) == FAIL) {
     retval = NULL;
   } else {
-    if (convert && tv.v_type == VAR_LIST) {
-      ga_init(&ga, (int)sizeof(char), 80);
-      if (tv.vval.v_list != NULL) {
-        tv_list_join(&ga, tv.vval.v_list, "\n");
-        if (tv_list_len(tv.vval.v_list) > 0) {
-          ga_append(&ga, NL);
-        }
-      }
-      ga_append(&ga, NUL);
-      retval = (char *)ga.ga_data;
-    } else if (convert && tv.v_type == VAR_FLOAT) {
-      char numbuf[NUMBUFLEN];
-      vim_snprintf(numbuf, NUMBUFLEN, "%g", tv.vval.v_float);
-      retval = xstrdup(numbuf);
-    } else {
-      retval = xstrdup(tv_get_string(&tv));
-    }
+    retval = typval2string(&tv, convert);
     tv_clear(&tv);
   }
   clear_evalarg(&EVALARG_EVALUATE, NULL);
@@ -990,7 +997,7 @@ char *eval_to_string(char *arg, bool convert)
 /// textlock.
 ///
 /// @param use_sandbox  when true, use the sandbox.
-char *eval_to_string_safe(char *arg, int use_sandbox)
+char *eval_to_string_safe(char *arg, const bool use_sandbox)
 {
   char *retval;
   funccal_entry_T funccal_entry;
@@ -1263,11 +1270,13 @@ void *call_func_retlist(const char *func, int argc, typval_T *argv)
 
 /// Evaluate 'foldexpr'.  Returns the foldlevel, and any character preceding
 /// it in "*cp".  Doesn't give error messages.
-int eval_foldexpr(char *arg, int *cp)
+int eval_foldexpr(win_T *wp, int *cp)
 {
-  typval_T tv;
-  varnumber_T retval;
-  int use_sandbox = was_set_insecurely(curwin, "foldexpr", OPT_LOCAL);
+  const sctx_T saved_sctx = current_sctx;
+  const bool use_sandbox = was_set_insecurely(wp, "foldexpr", OPT_LOCAL);
+
+  char *arg = wp->w_p_fde;
+  current_sctx = wp->w_p_script_ctx[WV_FDE].script_ctx;
 
   emsg_off++;
   if (use_sandbox) {
@@ -1275,6 +1284,9 @@ int eval_foldexpr(char *arg, int *cp)
   }
   textlock++;
   *cp = NUL;
+
+  typval_T tv;
+  varnumber_T retval;
   if (eval0(arg, &tv, NULL, &EVALARG_EVALUATE) == FAIL) {
     retval = 0;
   } else {
@@ -1294,14 +1306,52 @@ int eval_foldexpr(char *arg, int *cp)
     }
     tv_clear(&tv);
   }
+
   emsg_off--;
   if (use_sandbox) {
     sandbox--;
   }
   textlock--;
   clear_evalarg(&EVALARG_EVALUATE, NULL);
+  current_sctx = saved_sctx;
 
   return (int)retval;
+}
+
+/// Evaluate 'foldtext', returning an Array or a String (NULL_STRING on failure).
+Object eval_foldtext(win_T *wp)
+{
+  const bool use_sandbox = was_set_insecurely(wp, "foldtext", OPT_LOCAL);
+  char *arg = wp->w_p_fdt;
+  funccal_entry_T funccal_entry;
+
+  save_funccal(&funccal_entry);
+  if (use_sandbox) {
+    sandbox++;
+  }
+  textlock++;
+
+  typval_T tv;
+  Object retval;
+  if (eval0(arg, &tv, NULL, &EVALARG_EVALUATE) == FAIL) {
+    retval = STRING_OBJ(NULL_STRING);
+  } else {
+    if (tv.v_type == VAR_LIST) {
+      retval = vim_to_object(&tv);
+    } else {
+      retval = STRING_OBJ(cstr_to_string(tv_get_string(&tv)));
+    }
+    tv_clear(&tv);
+  }
+  clear_evalarg(&EVALARG_EVALUATE, NULL);
+
+  if (use_sandbox) {
+    sandbox--;
+  }
+  textlock--;
+  restore_funccal();
+
+  return retval;
 }
 
 /// Get an lvalue
@@ -5682,7 +5732,7 @@ void get_user_input(const typval_T *const argvars, typval_T *const rettv, const 
       p = lastnl + 1;
       msg_start();
       msg_clr_eos();
-      msg_puts_attr_len(prompt, p - prompt, echo_attr);
+      msg_puts_len(prompt, p - prompt, echo_attr);
       msg_didout = false;
       msg_starthere();
     }
@@ -5873,7 +5923,7 @@ void get_system_output_as_rettv(typval_T *argvars, typval_T *rettv, bool retlist
   if (p_verbose > 3) {
     char *cmdstr = shell_argv_to_str(argv);
     verbose_enter_scroll();
-    smsg(_("Executing command: \"%s\""), cmdstr);
+    smsg(0, _("Executing command: \"%s\""), cmdstr);
     msg_puts("\n\n");
     verbose_leave_scroll();
     xfree(cmdstr);
@@ -7969,7 +8019,7 @@ void ex_echo(exarg_T *eap)
       char *tofree = encode_tv2echo(&rettv, NULL);
       if (*tofree != NUL) {
         msg_ext_set_kind("echo");
-        msg_multiline_attr(tofree, echo_attr, true, &need_clear);
+        msg_multiline(tofree, echo_attr, true, &need_clear);
       }
       xfree(tofree);
     }
@@ -8053,7 +8103,7 @@ void ex_execute(exarg_T *eap)
 
     if (eap->cmdidx == CMD_echomsg) {
       msg_ext_set_kind("echomsg");
-      msg_attr(ga.ga_data, echo_attr);
+      msg(ga.ga_data, echo_attr);
     } else if (eap->cmdidx == CMD_echoerr) {
       // We don't want to abort following commands, restore did_emsg.
       int save_did_emsg = did_emsg;

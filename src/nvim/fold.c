@@ -12,17 +12,21 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "klib/kvec.h"
+#include "nvim/api/extmark.h"
+#include "nvim/api/private/defs.h"
+#include "nvim/api/private/helpers.h"
 #include "nvim/ascii.h"
 #include "nvim/buffer_defs.h"
 #include "nvim/buffer_updates.h"
 #include "nvim/change.h"
 #include "nvim/charset.h"
 #include "nvim/cursor.h"
+#include "nvim/decoration.h"
 #include "nvim/diff.h"
 #include "nvim/drawscreen.h"
 #include "nvim/eval.h"
 #include "nvim/eval/typval.h"
-#include "nvim/eval/typval_defs.h"
 #include "nvim/ex_session.h"
 #include "nvim/extmark.h"
 #include "nvim/fold.h"
@@ -37,9 +41,10 @@
 #include "nvim/message.h"
 #include "nvim/move.h"
 #include "nvim/ops.h"
-#include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/os/input.h"
 #include "nvim/plines.h"
+#include "nvim/pos.h"
 #include "nvim/search.h"
 #include "nvim/strings.h"
 #include "nvim/syntax.h"
@@ -1702,8 +1707,9 @@ static void foldDelMarker(buf_T *buf, linenr_T lnum, char *marker, size_t marker
 /// @return the text for a closed fold
 ///
 /// Otherwise the result is in allocated memory.
-char *get_foldtext(win_T *wp, linenr_T lnum, linenr_T lnume, foldinfo_T foldinfo, char *buf)
-  FUNC_ATTR_NONNULL_ARG(1)
+char *get_foldtext(win_T *wp, linenr_T lnum, linenr_T lnume, foldinfo_T foldinfo, char *buf,
+                   VirtText *vt)
+  FUNC_ATTR_NONNULL_ALL
 {
   char *text = NULL;
   // an error occurred when evaluating 'fdt' setting
@@ -1750,8 +1756,22 @@ char *get_foldtext(win_T *wp, linenr_T lnum, linenr_T lnume, foldinfo_T foldinfo
       current_sctx = wp->w_p_script_ctx[WV_FDT].script_ctx;
 
       emsg_off++;  // handle exceptions, but don't display errors
-      text = eval_to_string_safe(wp->w_p_fdt,
-                                 was_set_insecurely(wp, "foldtext", OPT_LOCAL));
+
+      Object obj = eval_foldtext(wp);
+      if (obj.type == kObjectTypeArray) {
+        Error err = ERROR_INIT;
+        *vt = parse_virt_text(obj.data.array, &err, NULL);
+        if (!ERROR_SET(&err)) {
+          *buf = NUL;
+          text = buf;
+        }
+        api_clear_error(&err);
+      } else if (obj.type == kObjectTypeString) {
+        text = obj.data.string.data;
+        obj = NIL;
+      }
+      api_free_object(obj);
+
       emsg_off--;
 
       if (text == NULL || did_emsg) {
@@ -2929,7 +2949,7 @@ static void foldlevelExpr(fline_T *flp)
   const bool save_keytyped = KeyTyped;
 
   int c;
-  const int n = eval_foldexpr(flp->wp->w_p_fde, &c);
+  const int n = eval_foldexpr(flp->wp, &c);
   KeyTyped = save_keytyped;
 
   switch (c) {
@@ -3320,10 +3340,25 @@ void f_foldtextresult(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 
   foldinfo_T info = fold_info(curwin, lnum);
   if (info.fi_lines > 0) {
-    char *text = get_foldtext(curwin, lnum, lnum + info.fi_lines - 1, info, buf);
+    VirtText vt = VIRTTEXT_EMPTY;
+    char *text = get_foldtext(curwin, lnum, lnum + info.fi_lines - 1, info, buf, &vt);
     if (text == buf) {
       text = xstrdup(text);
     }
+    if (kv_size(vt) > 0) {
+      assert(*text == NUL);
+      for (size_t i = 0; i < kv_size(vt);) {
+        int attr = 0;
+        char *new_text = next_virt_text_chunk(vt, &i, &attr);
+        if (new_text == NULL) {
+          break;
+        }
+        new_text = concat_str(text, new_text);
+        xfree(text);
+        text = new_text;
+      }
+    }
+    clear_virttext(&vt);
     rettv->vval.v_string = text;
   }
 

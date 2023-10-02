@@ -137,6 +137,8 @@ local function filter_complex_blocks(body)
     if not (string.find(line, "(^)", 1, true) ~= nil
             or string.find(line, "_ISwupper", 1, true)
             or string.find(line, "_Float")
+            or string.find(line, "__s128")
+            or string.find(line, "__u128")
             or string.find(line, "msgpack_zone_push_finalizer")
             or string.find(line, "msgpack_unpacker_reserve_buffer")
             or string.find(line, "value_init_")
@@ -849,6 +851,16 @@ local function ptr2key(ptr)
   return ffi.string(s)
 end
 
+local function is_asan()
+  cimport('./src/nvim/version.h')
+  local status, res = pcall(function() return lib.version_cflags end)
+  if status then
+    return ffi.string(res):match('-fsanitize=[a-z,]*address')
+  else
+    return false
+  end
+end
+
 local module = {
   cimport = cimport,
   cppimport = cppimport,
@@ -876,6 +888,7 @@ local module = {
   ptr2addr = ptr2addr,
   ptr2key = ptr2key,
   debug_log = debug_log,
+  is_asan = is_asan,
 }
 module = global_helpers.tbl_extend('error', module, global_helpers)
 return function()

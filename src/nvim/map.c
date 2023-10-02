@@ -9,11 +9,9 @@
 //       Map and Set does not make its own copy of the key or value.
 
 #include <stdbool.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "auto/config.h"
-#include "nvim/gettext.h"
 #include "nvim/map.h"
 #include "nvim/memory.h"
 
@@ -25,6 +23,8 @@
 #define equal_uint32_t equal_simple
 #define hash_int(x) hash_uint32_t((uint32_t)(x))
 #define equal_int equal_simple
+#define hash_int64_t(key) hash_uint64_t((uint64_t)key)
+#define equal_int64_t equal_simple
 
 #if defined(ARCH_64)
 # define hash_ptr_t(key) hash_uint64_t((uint64_t)(key))
@@ -44,25 +44,6 @@ static inline uint32_t hash_cstr_t(const char *s)
 }
 
 #define equal_cstr_t strequal
-
-// when used as a key, String doesn't need to be NUL terminated,
-// and can also contain embedded NUL:s as part of the data.
-static inline uint32_t hash_String(String s)
-{
-  uint32_t h = 0;
-  for (size_t i = 0; i < s.size; i++) {
-    h = (h << 5) - h + (uint8_t)s.data[i];
-  }
-  return h;
-}
-
-static inline bool equal_String(String a, String b)
-{
-  if (a.size != b.size) {
-    return false;
-  }
-  return memcmp(a.data, b.data, a.size) == 0;
-}
 
 static inline uint32_t hash_HlEntry(HlEntry ae)
 {
@@ -182,11 +163,18 @@ void mh_clear(MapHash *h)
 #undef VAL_NAME
 #undef KEY_NAME
 
-#define KEY_NAME(x) x##HlEntry
+#define KEY_NAME(x) x##int64_t
 #include "nvim/map_key_impl.c.h"
-#define VAL_NAME(x) quasiquote(x, int)
+#define VAL_NAME(x) quasiquote(x, ptr_t)
 #include "nvim/map_value_impl.c.h"
 #undef VAL_NAME
+#define VAL_NAME(x) quasiquote(x, int64_t)
+#include "nvim/map_value_impl.c.h"
+#undef VAL_NAME
+#undef KEY_NAME
+
+#define KEY_NAME(x) x##HlEntry
+#include "nvim/map_key_impl.c.h"
 #undef KEY_NAME
 
 #define KEY_NAME(x) x##ColorKey

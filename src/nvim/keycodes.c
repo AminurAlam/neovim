@@ -15,14 +15,12 @@
 #include "nvim/gettext.h"
 #include "nvim/globals.h"
 #include "nvim/keycodes.h"
-#include "nvim/log.h"
 #include "nvim/macros.h"
 #include "nvim/mbyte.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
 #include "nvim/mouse.h"
 #include "nvim/strings.h"
-#include "nvim/types.h"
 #include "nvim/vim.h"
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS
@@ -919,7 +917,8 @@ char *replace_termcodes(const char *const from, const size_t from_len, char **co
     // Check for special <> keycodes, like "<C-S-LeftMouse>"
     if (do_special && ((flags & REPTERM_DO_LT) || ((end - src) >= 3
                                                    && strncmp(src, "<lt>", 4) != 0))) {
-      // Replace <SID> by K_SNR <script-nr> _.
+      // Change <SID>Func to K_SNR <script-nr> _Func.  This name is used
+      // for script-local user functions.
       // (room: 5 * 6 = 30 bytes; needed: 3 + <nr> + 1 <= 14)
       if (end - src >= 4 && STRNICMP(src, "<SID>", 5) == 0) {
         if (sid_arg < 0 || (sid_arg == 0 && current_sctx.sc_sid <= 0)) {

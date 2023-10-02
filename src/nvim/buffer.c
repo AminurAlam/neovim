@@ -47,6 +47,7 @@
 #include "nvim/digraph.h"
 #include "nvim/drawscreen.h"
 #include "nvim/eval.h"
+#include "nvim/eval/typval_defs.h"
 #include "nvim/eval/vars.h"
 #include "nvim/ex_cmds.h"
 #include "nvim/ex_cmds2.h"
@@ -71,12 +72,14 @@
 #include "nvim/mapping.h"
 #include "nvim/mark.h"
 #include "nvim/mbyte.h"
+#include "nvim/memfile_defs.h"
 #include "nvim/memline_defs.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
 #include "nvim/move.h"
 #include "nvim/normal.h"
 #include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/optionstr.h"
 #include "nvim/os/fs_defs.h"
 #include "nvim/os/input.h"
@@ -206,7 +209,7 @@ int open_buffer(int read_stdin, exarg_T *eap, int flags_arg)
   int flags = flags_arg;
   int retval = OK;
   bufref_T old_curbuf;
-  long old_tw = curbuf->b_p_tw;
+  OptInt old_tw = curbuf->b_p_tw;
   int read_fifo = false;
   bool silent = shortmess(SHM_FILEINFO);
 
@@ -354,6 +357,7 @@ int open_buffer(int read_stdin, exarg_T *eap, int flags_arg)
   // Set last_changedtick to avoid triggering a TextChanged autocommand right
   // after it was added.
   curbuf->b_last_changedtick = buf_get_changedtick(curbuf);
+  curbuf->b_last_changedtick_i = buf_get_changedtick(curbuf);
   curbuf->b_last_changedtick_pum = buf_get_changedtick(curbuf);
 
   // require "!" to overwrite the file, because it wasn't read completely
@@ -747,6 +751,7 @@ void buf_clear_file(buf_T *buf)
 void buf_clear(void)
 {
   linenr_T line_count = curbuf->b_ml.ml_line_count;
+  extmark_free_all(curbuf);   // delete any extmarks
   while (!(curbuf->b_ml.ml_flags & ML_EMPTY)) {
     ml_delete((linenr_T)1, false);
   }
@@ -963,7 +968,7 @@ void goto_buffer(exarg_T *eap, int start, int dir, int count)
 void handle_swap_exists(bufref_T *old_curbuf)
 {
   cleanup_T cs;
-  long old_tw = curbuf->b_p_tw;
+  OptInt old_tw = curbuf->b_p_tw;
   buf_T *buf;
 
   if (swap_exists_action == SEA_QUIT) {
@@ -1104,13 +1109,13 @@ char *do_bufdel(int command, char *arg, int addr_count, int start_bnr, int end_b
       errormsg = IObuff;
     } else if (deleted >= p_report) {
       if (command == DOBUF_UNLOAD) {
-        smsg(NGETTEXT("%d buffer unloaded", "%d buffers unloaded", deleted),
+        smsg(0, NGETTEXT("%d buffer unloaded", "%d buffers unloaded", deleted),
              deleted);
       } else if (command == DOBUF_DEL) {
-        smsg(NGETTEXT("%d buffer deleted", "%d buffers deleted", deleted),
+        smsg(0, NGETTEXT("%d buffer deleted", "%d buffers deleted", deleted),
              deleted);
       } else {
-        smsg(NGETTEXT("%d buffer wiped out", "%d buffers wiped out", deleted),
+        smsg(0, NGETTEXT("%d buffer wiped out", "%d buffers wiped out", deleted),
              deleted);
       }
     }
@@ -1530,7 +1535,7 @@ void set_curbuf(buf_T *buf, int action)
   buf_T *prevbuf;
   int unload = (action == DOBUF_UNLOAD || action == DOBUF_DEL
                 || action == DOBUF_WIPE);
-  long old_tw = curbuf->b_p_tw;
+  OptInt old_tw = curbuf->b_p_tw;
 
   setpcmark();
   if ((cmdmod.cmod_flags & CMOD_KEEPALT) == 0) {
@@ -2856,7 +2861,7 @@ void buflist_list(exarg_T *eap)
                    buf == curbuf ? (int64_t)curwin->w_cursor.lnum : (int64_t)buflist_findlnum(buf));
     }
 
-    msg_outtrans(IObuff);
+    msg_outtrans(IObuff, 0);
     line_breakcheck();
   }
 
@@ -3181,7 +3186,7 @@ void fileinfo(int fullname, int shorthelp, int dont_truncate)
                    (curbuf->b_flags & BF_NOTEDITED) && !dontwrite
                    ? _("[Not edited]") : "",
                    (curbuf->b_flags & BF_NEW) && !dontwrite
-                   ? new_file_message() : "",
+                   ? _("[New]") : "",
                    (curbuf->b_flags & BF_READERR)
                    ? _("[Read errors]") : "",
                    curbuf->b_p_ro
@@ -3220,7 +3225,7 @@ void fileinfo(int fullname, int shorthelp, int dont_truncate)
               (int)curwin->w_cursor.col + 1, (int)curwin->w_virtcol + 1);
   }
 
-  (void)append_arg_number(curwin, buffer, IOSIZE, !shortmess(SHM_FILE));
+  (void)append_arg_number(curwin, buffer, IOSIZE);
 
   if (dont_truncate) {
     // Temporarily set msg_scroll to avoid the message being truncated.
@@ -3228,10 +3233,10 @@ void fileinfo(int fullname, int shorthelp, int dont_truncate)
     msg_start();
     n = msg_scroll;
     msg_scroll = true;
-    msg(buffer);
+    msg(buffer, 0);
     msg_scroll = n;
   } else {
-    p = msg_trunc_attr(buffer, false, 0);
+    p = msg_trunc(buffer, false, 0);
     if (restart_edit != 0 || (msg_scrolled && !need_wait_return)) {
       // Need to repeat the message after redrawing when:
       // - When restart_edit is set (otherwise there will be a delay
@@ -3371,7 +3376,7 @@ void maketitle(void)
         *buf_p = NUL;
       }
 
-      append_arg_number(curwin, buf_p, (int)(SPACE_FOR_ARGNR - (size_t)(buf_p - buf)), false);
+      append_arg_number(curwin, buf_p, (int)(SPACE_FOR_ARGNR - (size_t)(buf_p - buf)));
 
       xstrlcat(buf_p, " - NVIM", (sizeof(buf) - (size_t)(buf_p - buf)));
 
@@ -3508,15 +3513,14 @@ void get_rel_pos(win_T *wp, char *buf, int buflen)
   }
 }
 
-/// Append (file 2 of 8) to "buf[buflen]", if editing more than one file.
+/// Append (2 of 8) to "buf[buflen]", if editing more than one file.
 ///
 /// @param          wp        window whose buffers to check
 /// @param[in,out]  buf       string buffer to add the text to
 /// @param          buflen    length of the string buffer
-/// @param          add_file  if true, add "file" before the arg number
 ///
 /// @return  true if it was appended.
-bool append_arg_number(win_T *wp, char *buf, int buflen, bool add_file)
+bool append_arg_number(win_T *wp, char *buf, int buflen)
   FUNC_ATTR_NONNULL_ALL
 {
   // Nothing to do
@@ -3524,17 +3528,7 @@ bool append_arg_number(win_T *wp, char *buf, int buflen, bool add_file)
     return false;
   }
 
-  const char *msg;
-  switch ((wp->w_arg_idx_invalid ? 1 : 0) + (add_file ? 2 : 0)) {
-  case 0:
-    msg = _(" (%d of %d)"); break;
-  case 1:
-    msg = _(" ((%d) of %d)"); break;
-  case 2:
-    msg = _(" (file %d of %d)"); break;
-  case 3:
-    msg = _(" (file (%d) of %d)"); break;
-  }
+  const char *msg = wp->w_arg_idx_invalid ? _(" ((%d) of %d)") : _(" (%d of %d)");
 
   char *p = buf + strlen(buf);  // go to the end of the buffer
   vim_snprintf(p, (size_t)(buflen - (p - buf)), msg, wp->w_arg_idx + 1, ARGCOUNT);
@@ -3615,21 +3609,28 @@ void ex_buffer_all(exarg_T *eap)
   }
   while (true) {
     tpnext = curtab->tp_next;
-    for (wp = firstwin; wp != NULL; wp = wpnext) {
-      wpnext = wp->w_next;
+    // Try to close floating windows first
+    for (wp = lastwin->w_floating ? lastwin : firstwin; wp != NULL; wp = wpnext) {
+      wpnext = wp->w_floating
+        ? wp->w_prev->w_floating ? wp->w_prev : firstwin
+        : (wp->w_next == NULL || wp->w_next->w_floating) ? NULL : wp->w_next;
       if ((wp->w_buffer->b_nwindows > 1
+           || wp->w_floating
            || ((cmdmod.cmod_split & WSP_VERT)
                ? wp->w_height + wp->w_hsep_height + wp->w_status_height < Rows - p_ch
                - tabline_height() - global_stl_height()
                : wp->w_width != Columns)
            || (had_tab > 0 && wp != firstwin))
           && !ONE_WINDOW
-          && !(wp->w_closing
-               || wp->w_buffer->b_locked > 0)) {
-        win_close(wp, false, false);
-        wpnext = firstwin;              // just in case an autocommand does
-                                        // something strange with windows
-        tpnext = first_tabpage;         // start all over...
+          && !(wp->w_closing || wp->w_buffer->b_locked > 0)
+          && !is_aucmd_win(wp)) {
+        if (win_close(wp, false, false) == FAIL) {
+          break;
+        }
+        // Just in case an autocommand does something strange with
+        // windows: start all over...
+        wpnext = lastwin->w_floating ? lastwin : firstwin;
+        tpnext = first_tabpage;
         open_wins = 0;
       } else {
         open_wins++;
@@ -3649,7 +3650,8 @@ void ex_buffer_all(exarg_T *eap)
   //
   // Don't execute Win/Buf Enter/Leave autocommands here.
   autocmd_no_enter++;
-  win_enter(lastwin, false);
+  // lastwin may be aucmd_win
+  win_enter(lastwin_nofloating(), false);
   autocmd_no_leave++;
   for (buf = firstbuf; buf != NULL && open_wins < count; buf = buf->b_next) {
     // Check if this buffer needs a window
@@ -3667,7 +3669,7 @@ void ex_buffer_all(exarg_T *eap)
     } else {
       // Check if this buffer already has a window
       for (wp = firstwin; wp != NULL; wp = wp->w_next) {
-        if (wp->w_buffer == buf) {
+        if (!wp->w_floating && wp->w_buffer == buf) {
           break;
         }
       }
@@ -3741,7 +3743,7 @@ void ex_buffer_all(exarg_T *eap)
   // Close superfluous windows.
   for (wp = lastwin; open_wins > count;) {
     r = (buf_hide(wp->w_buffer) || !bufIsChanged(wp->w_buffer)
-         || autowrite(wp->w_buffer, false) == OK);
+         || autowrite(wp->w_buffer, false) == OK) && !is_aucmd_win(wp);
     if (!win_valid(wp)) {
       // BufWrite Autocommands made the window invalid, start over
       wp = lastwin;

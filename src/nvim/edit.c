@@ -48,12 +48,12 @@
 #include "nvim/normal.h"
 #include "nvim/ops.h"
 #include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/os/input.h"
 #include "nvim/plines.h"
 #include "nvim/popupmenu.h"
 #include "nvim/pos.h"
 #include "nvim/search.h"
-#include "nvim/spell.h"
 #include "nvim/state.h"
 #include "nvim/strings.h"
 #include "nvim/syntax.h"
@@ -878,6 +878,10 @@ static int insert_handle_key(InsertState *s)
 
   case K_EVENT:       // some event
     state_handle_k_event();
+    // If CTRL-G U was used apply it to the next typed key.
+    if (dont_sync_undo == kTrue) {
+      dont_sync_undo = kNone;
+    }
     goto check_pum;
 
   case K_COMMAND:     // <Cmd>command<CR>
@@ -1306,9 +1310,9 @@ void ins_redraw(bool ready)
     last_cursormoved = curwin->w_cursor;
   }
 
-  // Trigger TextChangedI if changedtick differs.
+  // Trigger TextChangedI if changedtick_i differs.
   if (ready && has_event(EVENT_TEXTCHANGEDI)
-      && curbuf->b_last_changedtick != buf_get_changedtick(curbuf)
+      && curbuf->b_last_changedtick_i != buf_get_changedtick(curbuf)
       && !pum_visible()) {
     aco_save_T aco;
     varnumber_T tick = buf_get_changedtick(curbuf);
@@ -1317,16 +1321,16 @@ void ins_redraw(bool ready)
     aucmd_prepbuf(&aco, curbuf);
     apply_autocmds(EVENT_TEXTCHANGEDI, NULL, NULL, false, curbuf);
     aucmd_restbuf(&aco);
-    curbuf->b_last_changedtick = buf_get_changedtick(curbuf);
+    curbuf->b_last_changedtick_i = buf_get_changedtick(curbuf);
     if (tick != buf_get_changedtick(curbuf)) {  // see ins_apply_autocmds()
       u_save(curwin->w_cursor.lnum,
              (linenr_T)(curwin->w_cursor.lnum + 1));
     }
   }
 
-  // Trigger TextChangedP if changedtick differs. When the popupmenu closes
-  // TextChangedI will need to trigger for backwards compatibility, thus use
-  // different b_last_changedtick* variables.
+  // Trigger TextChangedP if changedtick_pum differs. When the popupmenu
+  // closes TextChangedI will need to trigger for backwards compatibility,
+  // thus use different b_last_changedtick* variables.
   if (ready && has_event(EVENT_TEXTCHANGEDP)
       && curbuf->b_last_changedtick_pum != buf_get_changedtick(curbuf)
       && pum_visible()) {
@@ -1449,6 +1453,7 @@ void edit_putchar(int c, bool highlight)
 
     // save the character to be able to put it back
     if (pc_status == PC_STATUS_UNSET) {
+      // TODO(bfredl): save the schar_T instead
       grid_getbytes(&curwin->w_grid, pc_row, pc_col, pc_bytes, &pc_attr);
       pc_status = PC_STATUS_SET;
     }
@@ -1532,7 +1537,7 @@ void edit_unputchar(void)
     if (pc_status == PC_STATUS_RIGHT || pc_status == PC_STATUS_LEFT) {
       redrawWinline(curwin, curwin->w_cursor.lnum);
     } else {
-      grid_puts(&curwin->w_grid, pc_bytes, pc_row, pc_col, pc_attr);
+      grid_puts(&curwin->w_grid, pc_bytes, -1, pc_row, pc_col, pc_attr);
     }
   }
 }
@@ -3485,8 +3490,9 @@ static bool ins_esc(long *count, int cmdchar, bool nomove)
   // Otherwise remove the mode message.
   if (reg_recording != 0 || restart_edit != NUL) {
     showmode();
-  } else if (p_smd && (got_int || !skip_showmode())) {
-    msg("");
+  } else if (p_smd && (got_int || !skip_showmode())
+             && !(p_ch == 0 && !ui_has(kUIMessages))) {
+    msg("", 0);
   }
   // Exit Insert mode
   return true;
@@ -4429,9 +4435,8 @@ static bool ins_tab(void)
           }
         }
         if (!(State & VREPLACE_FLAG)) {
-          extmark_splice_cols(curbuf, (int)fpos.lnum - 1, change_col,
-                              cursor->col - change_col, fpos.col - change_col,
-                              kExtmarkUndo);
+          inserted_bytes(fpos.lnum, change_col,
+                         cursor->col - change_col, fpos.col - change_col);
         }
       }
       cursor->col -= i;
@@ -4631,8 +4636,6 @@ static int ins_ctrl_ey(int tc)
   } else {
     c = ins_copychar(curwin->w_cursor.lnum + (c == Ctrl_Y ? -1 : 1));
     if (c != NUL) {
-      long tw_save;
-
       // The character must be taken literally, insert like it
       // was typed after a CTRL-V, and pretend 'textwidth'
       // wasn't set.  Digits, 'o' and 'x' are special after a
@@ -4640,7 +4643,7 @@ static int ins_ctrl_ey(int tc)
       if (c < 256 && !isalnum(c)) {
         AppendToRedobuff(CTRL_V_STR);
       }
-      tw_save = curbuf->b_p_tw;
+      OptInt tw_save = curbuf->b_p_tw;
       curbuf->b_p_tw = -1;
       insert_special(c, true, false);
       curbuf->b_p_tw = tw_save;

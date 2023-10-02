@@ -20,7 +20,6 @@
 #include "nvim/charset.h"
 #include "nvim/eval.h"
 #include "nvim/eval/typval.h"
-#include "nvim/eval/typval_defs.h"
 #include "nvim/eval/userfunc.h"
 #include "nvim/garray.h"
 #include "nvim/gettext.h"
@@ -32,7 +31,7 @@
 #include "nvim/memline.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
-#include "nvim/option_defs.h"
+#include "nvim/option_vars.h"
 #include "nvim/os/input.h"
 #include "nvim/plines.h"
 #include "nvim/pos.h"
@@ -40,7 +39,6 @@
 #include "nvim/regexp_defs.h"
 #include "nvim/strings.h"
 #include "nvim/types.h"
-#include "nvim/undo_defs.h"
 #include "nvim/vim.h"
 
 #ifdef REGEXP_DEBUG
@@ -59,11 +57,7 @@
 #define un_Magic(x)     ((x) + 256)
 #define is_Magic(x)     ((x) < 0)
 
-// We should define ftpr as a pointer to a function returning a pointer to
-// a function returning a pointer to a function ...
-// This is impossible, so we declare a pointer to a function returning a
-// pointer to a function returning void. This should work for all compilers.
-typedef void (*(*fptr_T)(int *, int))(void);
+typedef void (*fptr_T)(int *, int);
 
 static int no_Magic(int x)
 {
@@ -1494,34 +1488,14 @@ static inline char *cstrchr(const char *const s, const int c)
 //                    regsub stuff                            //
 ////////////////////////////////////////////////////////////////
 
-// This stuff below really confuses cc on an SGI -- webb
-
-static fptr_T do_upper(int *d, int c)
+static void do_upper(int *d, int c)
 {
   *d = mb_toupper(c);
-
-  return (fptr_T)NULL;
 }
 
-static fptr_T do_Upper(int *d, int c)
-{
-  *d = mb_toupper(c);
-
-  return (fptr_T)do_Upper;
-}
-
-static fptr_T do_lower(int *d, int c)
+static void do_lower(int *d, int c)
 {
   *d = mb_tolower(c);
-
-  return (fptr_T)NULL;
-}
-
-static fptr_T do_Lower(int *d, int c)
-{
-  *d = mb_tolower(c);
-
-  return (fptr_T)do_Lower;
 }
 
 /// regtilde(): Replace tildes in the pattern by the old pattern.
@@ -1886,16 +1860,16 @@ static int vim_regsub_both(char *source, typval_T *expr, char *dest, int destlen
         } else if (vim_strchr("uUlLeE", (uint8_t)(*src))) {
           switch (*src++) {
           case 'u':
-            func_one = (fptr_T)do_upper;
+            func_one = do_upper;
             continue;
           case 'U':
-            func_all = (fptr_T)do_Upper;
+            func_all = do_upper;
             continue;
           case 'l':
-            func_one = (fptr_T)do_lower;
+            func_one = do_lower;
             continue;
           case 'L':
-            func_all = (fptr_T)do_Lower;
+            func_all = do_lower;
             continue;
           case 'e':
           case 'E':
@@ -1954,11 +1928,13 @@ static int vim_regsub_both(char *source, typval_T *expr, char *dest, int destlen
         } else {
           c = utf_ptr2char(src - 1);
         }
+
         // Write to buffer, if copy is set.
         if (func_one != NULL) {
-          func_one = (fptr_T)(func_one(&cc, c));
+          func_one(&cc, c);
+          func_one = NULL;
         } else if (func_all != NULL) {
-          func_all = (fptr_T)(func_all(&cc, c));
+          func_all(&cc, c);
         } else {
           // just copy
           cc = c;
@@ -2061,11 +2037,10 @@ static int vim_regsub_both(char *source, typval_T *expr, char *dest, int destlen
                 c = utf_ptr2char(s);
 
                 if (func_one != (fptr_T)NULL) {
-                  // Turbo C complains without the typecast
-                  func_one = (fptr_T)(func_one(&cc, c));
+                  func_one(&cc, c);
+                  func_one = NULL;
                 } else if (func_all != (fptr_T)NULL) {
-                  // Turbo C complains without the typecast
-                  func_all = (fptr_T)(func_all(&cc, c));
+                  func_all(&cc, c);
                 } else {  // just copy
                   cc = c;
                 }
@@ -2342,7 +2317,7 @@ regprog_T *vim_regcomp(const char *expr_arg, int re_flags)
       regexp_engine = expr[4] - '0';
       expr += 5;
 #ifdef REGEXP_DEBUG
-      smsg("New regexp mode selected (%d): %s",
+      smsg(0, "New regexp mode selected (%d): %s",
            regexp_engine,
            regname[newengine]);
 #endif

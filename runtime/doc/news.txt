@@ -65,6 +65,9 @@ The following changes may require adaptations in user config or plugins.
   now requires an explicit range argument to be passed. If injections are
   required, provide an explicit range via `parser:parse({ start_row, end_row })`.
 
+• Float window support hide and show by setting `hide` on `nvim_open_win` and
+  `nvim_win_set_config`.
+
 ==============================================================================
 NEW FEATURES                                                    *news-features*
 
@@ -89,6 +92,8 @@ The following new APIs and features were added.
 
 • Added inline virtual text support to |nvim_buf_set_extmark()|.
 
+• 'foldtext' now supports virtual text format. |fold-foldtext|
+
 • The terminal buffer now supports reflow (wrapped lines adapt when the buffer
   is resized horizontally). Note: Lines that are not visible and kept in
   |'scrollback'| are not reflown.
@@ -99,6 +104,8 @@ The following new APIs and features were added.
   by a range of text in a given window.
 
 • |nvim_set_keymap()| and |nvim_del_keymap()| now support abbreviations.
+
+• Better cmdline completion for string option value. |complete-set-option|
 
 • Builtin TUI can now recognize "super" (|<D-|) and "meta" (|<T-|) modifiers in a
   terminal emulator that supports |tui-csiu|.
@@ -120,6 +127,8 @@ The following new APIs and features were added.
     indicator to see if a server supports a feature. Instead use
     `client.supports_method(<method>)`. It considers both the dynamic
     capabilities and static `server_capabilities`.
+  • Added a new `anchor_bias` option to |lsp-handlers| to aid in positioning of
+    floating windows.
 
 • Treesitter
   • Bundled parsers and queries (highlight, folds) for Markdown, Python, and
@@ -133,9 +142,11 @@ The following new APIs and features were added.
     `vim.treesitter.language.register`.
   • The `#set!` directive now supports `injection.self` and `injection.parent` for injecting either the current node's language
     or the parent LanguageTree's language, respectively.
-  • Added `vim.treesitter.preview_query()`, for live editing of treesitter
+  • Added `vim.treesitter.query.edit()`, for live editing of treesitter
     queries.
   • Improved error messages for query parsing.
+  • Added |vim.treesitter.foldtext()| to apply treesitter highlighting to
+    foldtext.
 
 • |vim.ui.open()| opens URIs using the system default handler (macOS `open`,
   Windows `explorer`, Linux `xdg-open`, etc.)
@@ -164,6 +175,8 @@ The following new APIs and features were added.
 
 • |vim.lsp.util.locations_to_items()| sets the `user_data` of each item to the
   original LSP `Location` or `LocationLink`.
+
+• |$NVIM_APPNAME| can be set to a relative path instead of only a name.
 
 ==============================================================================
 CHANGED FEATURES                                                 *news-changed*
@@ -219,6 +232,20 @@ The following changes to existing APIs or features add new behavior.
   "virtual_text" table, which gives users more control over how diagnostic
   virtual text is displayed.
 
+• Extmarks now fully support multi-line ranges, and a single extmark can be
+  used to highlight a range of arbitrary length. The |nvim_buf_set_extmark()|
+  API function already allowed you to define such ranges, but highlight regions
+  were not rendered consistently for a range that covers more than one line break.
+  This has now been fixed. Signs defined as part of a multi-line extmark also
+  apply to every line in the range, not just the first.
+  In addition, |nvim_buf_get_extmarks()| has gained an "overlap" option to
+  return such ranges even if they started before the specified position.
+
+• LSP hover and signature help now use Treesitter for highlighting of Markdown
+  content.
+  Note that syntax highlighting of code examples requires a matching parser
+  and may be affected by custom queries.
+
 ==============================================================================
 REMOVED FEATURES                                                 *news-removed*
 
@@ -228,6 +255,12 @@ The following deprecated functions or APIs were removed.
   - :Vimuntar command removed.
 
 • Support for legacy treesitter injection queries is removed.
+
+• Removed 'shortmess' flags:
+  - |shm-f|. Always uses "(3 of 5)", never "(file 3 of 5)"
+  - |shm-i|. Always use "[noeol]".
+  - |shm-x|. Always use "[dos]", "[unix]" and "[mac]"
+  - |shm-n|. Always use "[New]".
 
 ==============================================================================
 DEPRECATIONS                                                *news-deprecations*
@@ -254,7 +287,13 @@ release.
   - |vim.lsp.util.get_progress_messages()|	Use |vim.lsp.status()| instead.
   - |vim.lsp.get_active_clients()|		Use |vim.lsp.get_clients()| instead.
   - |vim.lsp.for_each_buffer_client()|		Use |vim.lsp.get_clients()| instead.
+  - |vim.lsp.util.trim_empty_lines()|		Use |vim.split()| with `trimempty` instead.
+  - |vim.lsp.util.try_trim_markdown_code_blocks()|
+  - |vim.lsp.util.set_lines()|
 
 • `vim.loop` has been renamed to `vim.uv`.
+
+• vim.treesitter.languagetree functions:
+  - |LanguageTree:for_each_child()|	Use |LanguageTree:children()| (non-recursive) instead.
 
  vim:tw=78:ts=8:sw=2:et:ft=help:norl:

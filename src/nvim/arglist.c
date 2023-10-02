@@ -11,8 +11,10 @@
 #include "auto/config.h"
 #include "nvim/arglist.h"
 #include "nvim/ascii.h"
+#include "nvim/autocmd.h"
 #include "nvim/buffer.h"
 #include "nvim/charset.h"
+#include "nvim/cmdexpand_defs.h"
 #include "nvim/eval/typval.h"
 #include "nvim/eval/typval_defs.h"
 #include "nvim/eval/window.h"
@@ -30,6 +32,7 @@
 #include "nvim/memory.h"
 #include "nvim/message.h"
 #include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/os/input.h"
 #include "nvim/path.h"
 #include "nvim/pos.h"
@@ -857,12 +860,17 @@ static void arg_all_close_unused_windows(arg_all_state_T *aall)
   while (true) {
     win_T *wpnext = NULL;
     tabpage_T *tpnext = curtab->tp_next;
-    for (win_T *wp = firstwin; wp != NULL; wp = wpnext) {
+    // Try to close floating windows first
+    for (win_T *wp = lastwin->w_floating ? lastwin : firstwin; wp != NULL; wp = wpnext) {
       int i;
-      wpnext = wp->w_next;
+      wpnext = wp->w_floating
+        ? wp->w_prev->w_floating ? wp->w_prev : firstwin
+        : (wp->w_next == NULL || wp->w_next->w_floating) ? NULL : wp->w_next;
       buf_T *buf = wp->w_buffer;
       if (buf->b_ffname == NULL
-          || (!aall->keep_tabs && (buf->b_nwindows > 1 || wp->w_width != Columns))) {
+          || (!aall->keep_tabs
+              && (buf->b_nwindows > 1 || wp->w_width != Columns
+                  || (wp->w_floating && !is_aucmd_win(wp))))) {
         i = aall->opened_len;
       } else {
         // check if the buffer in this window is in the arglist
@@ -917,7 +925,7 @@ static void arg_all_close_unused_windows(arg_all_state_T *aall)
             (void)autowrite(buf, false);
             // Check if autocommands removed the window.
             if (!win_valid(wp) || !bufref_valid(&bufref)) {
-              wpnext = firstwin;  // Start all over...
+              wpnext = lastwin->w_floating ? lastwin : firstwin;  // Start all over...
               continue;
             }
           }
@@ -930,7 +938,7 @@ static void arg_all_close_unused_windows(arg_all_state_T *aall)
             // check if autocommands removed the next window
             if (!win_valid(wpnext)) {
               // start all over...
-              wpnext = firstwin;
+              wpnext = lastwin->w_floating ? lastwin : firstwin;
             }
           }
         }
@@ -977,6 +985,8 @@ static void arg_all_open_windows(arg_all_state_T *aall, int count)
             if (aall->keep_tabs) {
               aall->new_curwin = wp;
               aall->new_curtab = curtab;
+            } else if (wp->w_floating) {
+              break;
             } else if (wp->w_frame->fr_parent != curwin->w_frame->fr_parent) {
               emsg(_(e_window_layout_changed_unexpectedly));
               i = count;
@@ -1098,7 +1108,8 @@ static void do_arg_all(int count, int forceit, int keep_tabs)
   autocmd_no_leave++;
   last_curwin = curwin;
   last_curtab = curtab;
-  win_enter(lastwin, false);
+  // lastwin may be aucmd_win
+  win_enter(lastwin_nofloating(), false);
 
   // Open up to "count" windows.
   arg_all_open_windows(&aall, count);

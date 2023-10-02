@@ -290,6 +290,7 @@ endfunc
 
 func Test_strptime()
   CheckFunction strptime
+  CheckNotBSD
   CheckNotMSWindows
 
   if exists('$TZ')
@@ -305,6 +306,8 @@ func Test_strptime()
 
   call assert_fails('call strptime()', 'E119:')
   call assert_fails('call strptime("xxx")', 'E119:')
+  " This fails on BSD 14 and returns
+  " -2209078800 instead of 0
   call assert_equal(0, strptime("%Y", ''))
   call assert_equal(0, strptime("%Y", "xxx"))
 
@@ -2630,7 +2633,7 @@ func Test_state()
   call term_sendkeys(buf, getstate)
   call WaitForAssert({-> assert_match('state: mSc; mode: n', term_getline(buf, 6))}, 1000)
 
-  " A operator is pending
+  " An operator is pending
   call term_sendkeys(buf, ":call RunTimer()\<CR>y")
   call TermWait(buf, 25)
   call term_sendkeys(buf, "y")
@@ -3276,6 +3279,28 @@ endfunc
 func Test_fullcommand()
   " this used to crash vim
   call assert_equal('', fullcommand(10))
+endfunc
+
+" Test for glob() with shell special patterns
+func Test_glob_extended_bash()
+  CheckExecutable bash
+  CheckNotMSWindows
+  CheckNotMac   " The default version of bash is old on macOS.
+
+  let _shell = &shell
+  set shell=bash
+
+  call mkdir('Xtestglob/foo/bar/src', 'p')
+  call writefile([], 'Xtestglob/foo/bar/src/foo.sh')
+  call writefile([], 'Xtestglob/foo/bar/src/foo.h')
+  call writefile([], 'Xtestglob/foo/bar/src/foo.cpp')
+
+  " Sort output of glob() otherwise we end up with different
+  " ordering depending on whether file system is case-sensitive.
+  let expected = ['Xtestglob/foo/bar/src/foo.cpp', 'Xtestglob/foo/bar/src/foo.h']
+  call assert_equal(expected, sort(glob('Xtestglob/**/foo.{h,cpp}', 0, 1)))
+  call delete('Xtestglob', 'rf')
+  let &shell=_shell
 endfunc
 
 " vim: shiftwidth=2 sts=2 expandtab

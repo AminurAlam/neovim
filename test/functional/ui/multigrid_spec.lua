@@ -2307,6 +2307,7 @@ describe('ext_multigrid', function()
       {1:~                                                                               }|
     ]]}
 
+    -- XXX: mouse_check_grid() doesn't work properly when clicking on grid 1
     meths.input_mouse('left', 'press', '', 1, 6, 20)
     -- TODO(bfredl): "batching" input_mouse is formally not supported yet.
     -- Normally it should work fine in async context when nvim is not blocked,
@@ -2886,7 +2887,7 @@ describe('ext_multigrid', function()
     ## grid 3
                                                            |
     ## grid 4
-      ^Lorem i|
+      Lorem i|
       psum do|
       lor sit|
        amet, |
@@ -2895,7 +2896,7 @@ describe('ext_multigrid', function()
       ipiscin|
       g elit,|
        sed do|
-       eiusmo|
+       ^eiusmo|
       {1:~      }|
     ## grid 5
       some text                     |

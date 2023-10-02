@@ -9,6 +9,7 @@
 #include "klib/kvec.h"
 #include "lauxlib.h"
 #include "nvim/api/command.h"
+#include "nvim/api/keysets.h"
 #include "nvim/api/private/defs.h"
 #include "nvim/api/private/dispatch.h"
 #include "nvim/api/private/helpers.h"
@@ -16,6 +17,7 @@
 #include "nvim/ascii.h"
 #include "nvim/autocmd.h"
 #include "nvim/buffer_defs.h"
+#include "nvim/cmdexpand_defs.h"
 #include "nvim/decoration.h"
 #include "nvim/ex_cmds.h"
 #include "nvim/ex_docmd.h"
@@ -860,11 +862,12 @@ static void build_cmdline_str(char **cmdlinep, exarg_T *eap, CmdParseInfo *cmdin
 /// For Lua usage see |lua-guide-commands-create|.
 ///
 /// Example:
-/// <pre>vim
-///    :call nvim_create_user_command('SayHello', 'echo "Hello world!"', {'bang': v:true})
-///    :SayHello
-///    Hello world!
-/// </pre>
+///
+/// ```vim
+/// :call nvim_create_user_command('SayHello', 'echo "Hello world!"', {'bang': v:true})
+/// :SayHello
+/// Hello world!
+/// ```
 ///
 /// @param  name    Name of the new user command. Must begin with an uppercase letter.
 /// @param  command Replacement command to execute when this user command is executed. When called

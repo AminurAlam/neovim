@@ -17,7 +17,6 @@
 #include "klib/kvec.h"
 #include "nvim/api/private/defs.h"
 #include "nvim/ascii.h"
-#include "nvim/buffer_defs.h"
 #include "nvim/globals.h"
 #include "nvim/grid.h"
 #include "nvim/highlight.h"
@@ -26,7 +25,7 @@
 #include "nvim/macros.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
-#include "nvim/option_defs.h"
+#include "nvim/option_vars.h"
 #include "nvim/os/time.h"
 #include "nvim/types.h"
 #include "nvim/ui.h"
@@ -55,7 +54,7 @@ static int msg_current_row = INT_MAX;
 static bool msg_was_scrolled = false;
 
 static int msg_sep_row = -1;
-static schar_T msg_sep_char = { ' ', NUL };
+static schar_T msg_sep_char = schar_from_ascii(' ');
 
 static int dbghl_normal, dbghl_clear, dbghl_composed, dbghl_recompose;
 
@@ -354,7 +353,7 @@ static void compose_line(Integer row, Integer startcol, Integer endcol, LineFlag
       grid = &msg_grid;
       sattr_T msg_sep_attr = (sattr_T)HL_ATTR(HLF_MSGSEP);
       for (int i = col; i < until; i++) {
-        memcpy(linebuf[i - startcol], msg_sep_char, sizeof(*linebuf));
+        linebuf[i - startcol] = msg_sep_char;
         attrbuf[i - startcol] = msg_sep_attr;
       }
     } else {
@@ -363,9 +362,8 @@ static void compose_line(Integer row, Integer startcol, Integer endcol, LineFlag
       memcpy(linebuf + (col - startcol), grid->chars + off, n * sizeof(*linebuf));
       memcpy(attrbuf + (col - startcol), grid->attrs + off, n * sizeof(*attrbuf));
       if (grid->comp_col + grid->cols > until
-          && grid->chars[off + n][0] == NUL) {
-        linebuf[until - 1 - startcol][0] = ' ';
-        linebuf[until - 1 - startcol][1] = '\0';
+          && grid->chars[off + n] == NUL) {
+        linebuf[until - 1 - startcol] = schar_from_ascii(' ');
         if (col == startcol && n == 1) {
           skipstart = 0;
         }
@@ -378,10 +376,10 @@ static void compose_line(Integer row, Integer startcol, Integer endcol, LineFlag
       for (int i = col - (int)startcol; i < until - startcol; i += width) {
         width = 1;
         // negative space
-        bool thru = strequal((char *)linebuf[i], " ") && bg_line[i][0] != NUL;
-        if (i + 1 < endcol - startcol && bg_line[i + 1][0] == NUL) {
+        bool thru = linebuf[i] == schar_from_ascii(' ') && bg_line[i] != NUL;
+        if (i + 1 < endcol - startcol && bg_line[i + 1] == NUL) {
           width = 2;
-          thru &= strequal((char *)linebuf[i + 1], " ");
+          thru &= linebuf[i + 1] == schar_from_ascii(' ');
         }
         attrbuf[i] = (sattr_T)hl_blend_attrs(bg_attrs[i], attrbuf[i], &thru);
         if (width == 2) {
@@ -396,28 +394,25 @@ static void compose_line(Integer row, Integer startcol, Integer endcol, LineFlag
 
     // Tricky: if overlap caused a doublewidth char to get cut-off, must
     // replace the visible half with a space.
-    if (linebuf[col - startcol][0] == NUL) {
-      linebuf[col - startcol][0] = ' ';
-      linebuf[col - startcol][1] = NUL;
+    if (linebuf[col - startcol] == NUL) {
+      linebuf[col - startcol] = schar_from_ascii(' ');
       if (col == endcol - 1) {
         skipend = 0;
       }
-    } else if (col == startcol && n > 1 && linebuf[1][0] == NUL) {
+    } else if (col == startcol && n > 1 && linebuf[1] == NUL) {
       skipstart = 0;
     }
 
     col = until;
   }
-  if (linebuf[endcol - startcol - 1][0] == NUL) {
+  if (linebuf[endcol - startcol - 1] == NUL) {
     skipend = 0;
   }
 
   assert(endcol <= chk_width);
   assert(row < chk_height);
 
-  if (!(grid && grid == &default_grid)) {
-    // TODO(bfredl): too conservative, need check
-    // grid->line_wraps if grid->Width == Width
+  if (!(grid && (grid == &default_grid || (grid->comp_col == 0 && grid->cols == Columns)))) {
     flags = flags & ~kLineFlagWrap;
   }
 
@@ -465,7 +460,7 @@ static void compose_debug(Integer startrow, Integer endrow, Integer startcol, In
 static void debug_delay(Integer lines)
 {
   ui_call_flush();
-  uint64_t wd = (uint64_t)labs(p_wd);
+  uint64_t wd = (uint64_t)llabs(p_wd);
   uint64_t factor = (uint64_t)MAX(MIN(lines, 5), 1);
   os_sleep(factor * wd);
 }
@@ -568,7 +563,7 @@ void ui_comp_msg_set_pos(Integer grid, Integer row, Boolean scrolled, String sep
   if (scrolled && row > 0) {
     msg_sep_row = (int)row - 1;
     if (sep_char.data) {
-      xstrlcpy(msg_sep_char, sep_char.data, sizeof(msg_sep_char));
+      msg_sep_char = schar_from_buf(sep_char.data, sep_char.size);
     }
   } else {
     msg_sep_row = -1;

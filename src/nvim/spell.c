@@ -90,6 +90,7 @@
 #include "nvim/memory.h"
 #include "nvim/message.h"
 #include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/os/fs.h"
 #include "nvim/os/input.h"
 #include "nvim/os/os_defs.h"
@@ -1280,7 +1281,7 @@ static TriState decor_spell_nav_col(win_T *wp, linenr_T lnum, linenr_T *decor_ln
     decor_redraw_line(wp, lnum - 1, &decor_state);
     *decor_lnum = lnum;
   }
-  decor_redraw_col(wp, col, col, false, &decor_state);
+  decor_redraw_col(wp, col, 0, false, &decor_state);
   return decor_state.spell;
 }
 
@@ -1626,7 +1627,7 @@ static void spell_load_lang(char *lang)
                lang);
       do_cmdline_cmd(autocmd_buf);
     } else {
-      smsg(_("Warning: Cannot find word list \"%s.%s.spl\" or \"%s.ascii.spl\""),
+      smsg(0, _("Warning: Cannot find word list \"%s.%s.spl\" or \"%s.ascii.spl\""),
            lang, spell_enc(), lang);
     }
   } else if (sl.sl_slang != NULL) {
@@ -2076,7 +2077,7 @@ char *parse_spelllang(win_T *wp)
             } else {
               // This is probably an error.  Give a warning and
               // accept the words anyway.
-              smsg(_("Warning: region %s not supported"),
+              smsg(0, _("Warning: region %s not supported"),
                    region);
             }
           } else {

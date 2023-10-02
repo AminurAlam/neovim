@@ -4,6 +4,7 @@ source shared.vim
 source check.vim
 source term_util.vim
 source screendump.vim
+source vim9.vim
 source load.vim
 
 func s:cleanup_buffers() abort
@@ -99,6 +100,22 @@ if has('timers')
     call feedkeys("a\<C-X>", 'x!')
     call assert_equal(0, g:triggered)
     unlet g:triggered
+    au! CursorHoldI
+    set updatetime&
+  endfunc
+
+  func Test_cursorhold_insert_ctrl_g_U()
+    au CursorHoldI * :
+    set updatetime=20
+    new
+    call timer_start(100, { -> feedkeys("\<Left>foo\<Esc>", 't') })
+    call feedkeys("i()\<C-g>U", 'tx!')
+    sleep 200m
+    call assert_equal('(foo)', getline(1))
+    undo
+    call assert_equal('', getline(1))
+
+    bwipe!
     au! CursorHoldI
     set updatetime&
   endfunc
@@ -2002,8 +2019,8 @@ endfunc
 " Test for BufUnload autocommand that unloads all the other buffers
 func Test_bufunload_all()
   let g:test_is_flaky = 1
-  call writefile(['Test file Xxx1'], 'Xxx1', 'D')"
-  call writefile(['Test file Xxx2'], 'Xxx2', 'D')"
+  call writefile(['Test file Xxx1'], 'Xxx1', 'D')
+  call writefile(['Test file Xxx2'], 'Xxx2', 'D')
 
   let content =<< trim [CODE]
     func UnloadAllBufs()
@@ -2441,7 +2458,7 @@ endfunc
 
 " Test TextChangedI and TextChangedP
 func Test_ChangedP()
-  throw 'Skipped: use test/functional/editor/completion_spec.lua'
+  throw 'Skipped: use test/functional/autocmd/textchanged_spec.lua'
   new
   call setline(1, ['foo', 'bar', 'foobar'])
   call test_override("char_avail", 1)
@@ -2451,6 +2468,7 @@ func Test_ChangedP()
     let g:autocmd .= a:char
   endfunc
 
+  " TextChanged will not be triggered, only check that it isn't.
   au! TextChanged <buffer> :call TextChangedAutocmd('N')
   au! TextChangedI <buffer> :call TextChangedAutocmd('I')
   au! TextChangedP <buffer> :call TextChangedAutocmd('P')
@@ -2504,7 +2522,7 @@ func SetLineOne()
 endfunc
 
 func Test_TextChangedI_with_setline()
-  CheckFunction test_override
+  throw 'Skipped: use test/functional/autocmd/textchanged_spec.lua'
   new
   call test_override('char_avail', 1)
   autocmd TextChangedI <buffer> call SetLineOne()
@@ -3432,6 +3450,70 @@ func Test_autocmd_vimgrep()
   augroup END
 endfunc
 
+" Test TextChangedI and TextChanged
+func Test_Changed_ChangedI()
+  throw 'Skipped: use test/functional/autocmd/textchanged_spec.lua'
+  new
+  call test_override("char_avail", 1)
+  let [g:autocmd_i, g:autocmd_n] = ['','']
+
+  func! TextChangedAutocmdI(char)
+    let g:autocmd_{tolower(a:char)} = a:char .. b:changedtick
+  endfunc
+
+  augroup Test_TextChanged
+    au!
+    au TextChanged  <buffer> :call TextChangedAutocmdI('N')
+    au TextChangedI <buffer> :call TextChangedAutocmdI('I')
+  augroup END
+
+  call feedkeys("ifoo\<esc>", 'tnix')
+  " TODO: Test test does not seem to trigger TextChanged autocommand, this
+  " requires running Vim in a terminal window.
+  " call assert_equal('N3', g:autocmd_n)
+  call assert_equal('I3', g:autocmd_i)
+
+  call feedkeys("yyp", 'tnix')
+  " TODO: Test test does not seem to trigger TextChanged autocommand.
+  " call assert_equal('N4', g:autocmd_n)
+  call assert_equal('I3', g:autocmd_i)
+
+  " CleanUp
+  call test_override("char_avail", 0)
+  au! TextChanged  <buffer>
+  au! TextChangedI <buffer>
+  augroup! Test_TextChanged
+  delfu TextChangedAutocmdI
+  unlet! g:autocmd_i g:autocmd_n
+
+  bw!
+endfunc
+
+func Test_closing_autocmd_window()
+  let lines =<< trim END
+      edit Xa.txt
+      tabnew Xb.txt
+      autocmd BufEnter Xa.txt unhide 1
+      doautoall BufEnter
+  END
+  call CheckScriptFailure(lines, 'E814:')
+  au! BufEnter
+  bwipe Xa.txt
+  bwipe Xb.txt
+endfunc
+
+func Test_switch_window_in_autocmd_window()
+  edit Xa.txt
+  tabnew Xb.txt
+  autocmd BufEnter Xa.txt wincmd w
+  doautoall BufEnter
+  au! BufEnter
+  bwipe Xa.txt
+  call assert_false(bufexists('Xa.txt'))
+  bwipe Xb.txt
+  call assert_false(bufexists('Xb.txt'))
+endfunc
+
 func Test_bufwipeout_changes_window()
   " This should not crash, but we don't have any expectations about what
   " happens, changing window in BufWipeout has unpredictable results.
@@ -3645,7 +3727,7 @@ endfunc
 func SetupVimTest_shm()
   let g:bwe = []
   let g:brp = []
-  set shortmess+=F
+  set shortmess-=l
   messages clear
 
   let dirname='XVimTestSHM'

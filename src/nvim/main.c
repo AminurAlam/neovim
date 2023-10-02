@@ -16,7 +16,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "auto/config.h"
 #include "nvim/arglist.h"
 #include "nvim/ascii.h"
 #include "nvim/autocmd.h"
@@ -29,7 +28,6 @@
 #include "nvim/drawscreen.h"
 #include "nvim/eval.h"
 #include "nvim/eval/typval.h"
-#include "nvim/eval/typval_defs.h"
 #include "nvim/eval/userfunc.h"
 #include "nvim/event/multiqueue.h"
 #include "nvim/event/stream.h"
@@ -53,7 +51,6 @@
 #include "nvim/macros.h"
 #include "nvim/main.h"
 #include "nvim/mark.h"
-#include "nvim/memfile_defs.h"
 #include "nvim/memline.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
@@ -62,14 +59,13 @@
 #include "nvim/normal.h"
 #include "nvim/ops.h"
 #include "nvim/option.h"
-#include "nvim/option_defs.h"
+#include "nvim/option_vars.h"
 #include "nvim/optionstr.h"
 #include "nvim/os/fileio.h"
 #include "nvim/os/input.h"
 #include "nvim/os/lang.h"
 #include "nvim/os/os.h"
 #include "nvim/os/stdpaths_defs.h"
-#include "nvim/os/time.h"
 #include "nvim/path.h"
 #include "nvim/popupmenu.h"
 #include "nvim/pos.h"
@@ -251,7 +247,7 @@ int main(int argc, char **argv)
   argv0 = argv[0];
 
   if (!appname_is_valid()) {
-    os_errmsg("$NVIM_APPNAME is not a valid file name.\n");
+    os_errmsg("$NVIM_APPNAME must be a name or relative path.\n");
     exit(1);
   }
 
@@ -341,7 +337,7 @@ int main(int argc, char **argv)
     uint64_t rv = ui_client_start_server(params.argc, params.argv);
     if (!rv) {
       os_errmsg("Failed to start Nvim server!\n");
-      getout(1);
+      os_exit(1);
     }
     ui_client_channel_id = rv;
   }
@@ -367,7 +363,7 @@ int main(int argc, char **argv)
   }
 
   assert(p_ch >= 0 && Rows >= p_ch && Rows - p_ch <= INT_MAX);
-  cmdline_row = (int)(Rows - p_ch);
+  cmdline_row = Rows - (int)p_ch;
   msg_row = cmdline_row;
   default_grid_alloc();  // allocate screen buffers
   set_init_2(headless_mode);
@@ -659,6 +655,9 @@ void os_exit(int r)
 
   if (ui_client_channel_id) {
     ui_client_stop();
+    if (r == 0) {
+      r = ui_client_exit_status;
+    }
   } else {
     ui_flush();
     ui_call_stop();
@@ -1262,7 +1261,7 @@ static void command_line_scan(mparm_T *parmp)
         // "-w {scriptout}" write to script
         if (ascii_isdigit((argv[0])[argv_idx])) {
           n = get_number_arg(argv[0], &argv_idx, 10);
-          set_option_value_give_err("window", NUMBER_OPTVAL(n), 0);
+          set_option_value_give_err("window", NUMBER_OPTVAL((OptInt)n), 0);
           break;
         }
         want_argument = true;
@@ -1404,7 +1403,7 @@ scripterror:
           if (ascii_isdigit(*(argv[0]))) {
             argv_idx = 0;
             n = get_number_arg(argv[0], &argv_idx, 10);
-            set_option_value_give_err("window", NUMBER_OPTVAL(n), 0);
+            set_option_value_give_err("window", NUMBER_OPTVAL((OptInt)n), 0);
             argv_idx = -1;
             break;
           }
@@ -1579,6 +1578,7 @@ static void handle_tag(char *tagname)
 
     // If the user doesn't want to edit the file then we quit here.
     if (swap_exists_did_quit) {
+      ui_call_error_exit(1);
       getout(1);
     }
   }
@@ -1722,6 +1722,7 @@ static void create_windows(mparm_T *parmp)
           if (got_int || only_one_window()) {
             // abort selected or quit and only one window
             did_emsg = false;               // avoid hit-enter prompt
+            ui_call_error_exit(1);
             getout(1);
           }
           // We can't close the window, it would disturb what
@@ -1825,6 +1826,7 @@ static void edit_buffers(mparm_T *parmp, char *cwd)
         if (got_int || only_one_window()) {
           // abort selected and only one window
           did_emsg = false;             // avoid hit-enter prompt
+          ui_call_error_exit(1);
           getout(1);
         }
         win_close(curwin, true, false);
@@ -2235,6 +2237,7 @@ static void usage(void)
 static void check_swap_exists_action(void)
 {
   if (swap_exists_action == SEA_QUIT) {
+    ui_call_error_exit(1);
     getout(1);
   }
   handle_swap_exists(NULL);

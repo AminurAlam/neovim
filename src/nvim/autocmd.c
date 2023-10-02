@@ -34,7 +34,7 @@
 #include "nvim/memline_defs.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
-#include "nvim/option_defs.h"
+#include "nvim/option.h"
 #include "nvim/optionstr.h"
 #include "nvim/os/input.h"
 #include "nvim/os/os.h"
@@ -228,7 +228,7 @@ static void au_show_for_event(int group, event_T event, const char *pat)
         }
 
         msg_col = 4;
-        msg_outtrans(ac->pat->pat);
+        msg_outtrans(ac->pat->pat, 0);
       }
 
       if (got_int) {
@@ -253,12 +253,12 @@ static void au_show_for_event(int group, event_T event, const char *pat)
         } else {
           snprintf(msg, msglen, "%s [%s]", exec_to_string, ac->desc);
         }
-        msg_outtrans(msg);
+        msg_outtrans(msg, 0);
         XFREE_CLEAR(msg);
       } else if (ac->exec.type == CALLABLE_CB) {
         msg_puts_attr(exec_to_string, HL_ATTR(HLF_8));
       } else {
-        msg_outtrans(exec_to_string);
+        msg_outtrans(exec_to_string, 0);
       }
       XFREE_CLEAR(exec_to_string);
       if (p_verbose > 0) {
@@ -372,7 +372,7 @@ void aubuflocal_remove(buf_T *buf)
 
       if (p_verbose >= 6) {
         verbose_enter();
-        smsg(_("auto-removing autocommand: %s <buffer=%d>"), event_nr2name(event), buf->b_fnum);
+        smsg(0, _("auto-removing autocommand: %s <buffer=%d>"), event_nr2name(event), buf->b_fnum);
         verbose_leave();
       }
     }
@@ -1150,7 +1150,7 @@ int do_doautocmd(char *arg_start, bool do_msg, bool *did_something)
   }
 
   if (nothing_done && do_msg && !aborting()) {
-    smsg(_("No matching autocommands: %s"), arg_start);
+    smsg(0, _("No matching autocommands: %s"), arg_start);
   }
   if (did_something != NULL) {
     *did_something = !nothing_done;
@@ -1341,7 +1341,6 @@ void aucmd_restbuf(aco_save_T *aco)
   if (aco->use_aucmd_win_idx >= 0) {
     win_T *awp = aucmd_win[aco->use_aucmd_win_idx].auc_win;
 
-    curbuf->b_nwindows--;
     // Find "awp", it can't be closed, but it may be in another tab page.
     // Do not trigger autocommands here.
     block_autocmds();
@@ -1357,7 +1356,7 @@ void aucmd_restbuf(aco_save_T *aco)
       }
     }
 win_found:
-    ;
+    curbuf->b_nwindows--;
     const bool save_stop_insert_mode = stop_insert_mode;
     // May need to stop Insert mode if we were in a prompt buffer.
     leaving_window(curwin);
@@ -1947,7 +1946,7 @@ static void aucmd_next(AutoPatCmd *apc)
       snprintf(namep, sourcing_name_len, s, name, ap->pat);
       if (p_verbose >= 8) {
         verbose_enter();
-        smsg(_("Executing %s"), namep);
+        smsg(0, _("Executing %s"), namep);
         verbose_leave();
       }
 
@@ -2046,7 +2045,7 @@ char *getnextac(int c, void *cookie, int indent, bool do_concat)
   if (p_verbose >= 9) {
     verbose_enter_scroll();
     char *exec_to_string = aucmd_exec_to_string(ac, ac->exec);
-    smsg(_("autocommand %s"), exec_to_string);
+    smsg(0, _("autocommand %s"), exec_to_string);
     msg_puts("\n");  // don't overwrite this either
     XFREE_CLEAR(exec_to_string);
     verbose_leave_scroll();
@@ -2212,6 +2211,13 @@ char *expand_get_event_name(expand_T *xp, int idx)
 
   // List event names
   return event_names[idx - next_augroup_id].name;
+}
+
+/// Function given to ExpandGeneric() to obtain the list of event names. Don't
+/// include groups.
+char *get_event_name_no_group(expand_T *xp FUNC_ATTR_UNUSED, int idx)
+{
+  return event_names[idx].name;
 }
 
 /// Check whether given autocommand is supported
@@ -2524,7 +2530,7 @@ static bool arg_autocmd_flag_get(bool *flag, char **cmd_ptr, char *pattern, int 
 }
 
 /// When kFalse: VimSuspend should be triggered next.
-/// When kTrue: VimResume should be triggerd next.
+/// When kTrue: VimResume should be triggered next.
 /// When kNone: Currently triggering VimSuspend or VimResume.
 static TriState pending_vimresume = kFalse;
 

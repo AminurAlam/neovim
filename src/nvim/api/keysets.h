@@ -51,6 +51,15 @@ typedef struct {
 } Dict(set_extmark);
 
 typedef struct {
+  OptionalKeys is_set__get_extmarks_;
+  Integer limit;
+  Boolean details;
+  Boolean hl_name;
+  Boolean overlap;
+  String type;
+} Dict(get_extmarks);
+
+typedef struct {
   OptionalKeys is_set__keymap_;
   Boolean noremap;
   Boolean nowait;
@@ -103,6 +112,8 @@ typedef struct {
   String footer_pos;
   String style;
   Boolean noautocmd;
+  Boolean fixed;
+  Boolean hide;
 } Dict(float_config);
 
 typedef struct {
@@ -159,6 +170,7 @@ typedef struct {
   Integer blend;
   Boolean fg_indexed;
   Boolean bg_indexed;
+  Boolean force;
 } Dict(highlight);
 
 typedef struct {
@@ -181,7 +193,13 @@ typedef struct {
   Integer id;
   String name;
   Boolean link;
+  Boolean create;
 } Dict(get_highlight);
+
+typedef struct {
+  OptionalKeys is_set__get_ns_;
+  Window winid;
+} Dict(get_ns);
 
 typedef struct {
   OptionalKeys is_set__win_text_height_;

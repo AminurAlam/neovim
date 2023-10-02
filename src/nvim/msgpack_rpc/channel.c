@@ -24,6 +24,7 @@
 #include "nvim/event/rstream.h"
 #include "nvim/event/stream.h"
 #include "nvim/event/wstream.h"
+#include "nvim/globals.h"
 #include "nvim/log.h"
 #include "nvim/main.h"
 #include "nvim/map.h"
@@ -207,8 +208,14 @@ Object rpc_send_call(uint64_t id, const char *method_name, Array args, ArenaMem 
   // Push the frame
   ChannelCallFrame frame = { request_id, false, false, NIL, NULL };
   kv_push(rpc->call_stack, &frame);
-  LOOP_PROCESS_EVENTS_UNTIL(&main_loop, channel->events, -1, frame.returned);
+  LOOP_PROCESS_EVENTS_UNTIL(&main_loop, channel->events, -1, frame.returned || rpc->closed);
   (void)kv_pop(rpc->call_stack);
+
+  if (rpc->closed) {
+    api_set_error(err, kErrorTypeException, "Invalid channel: %" PRIu64, id);
+    channel_decref(channel);
+    return NIL;
+  }
 
   if (frame.errored) {
     if (frame.result.type == kObjectTypeString) {
@@ -342,6 +349,7 @@ static void parse_msgpack(Channel *channel)
                  "id %" PRIu32 ". Ensure the client is properly synchronized",
                  channel->id, (unsigned)channel->rpc.client_type, p->request_id);
         chan_close_with_error(channel, buf, LOGLVL_ERR);
+        return;
       }
       frame->returned = true;
       frame->errored = (p->error.type != kObjectTypeNil);

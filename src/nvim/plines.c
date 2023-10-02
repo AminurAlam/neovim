@@ -3,9 +3,9 @@
 
 // plines.c: calculate the vertical and horizontal size of text in a window
 
-#include <inttypes.h>
 #include <limits.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "nvim/ascii.h"
@@ -21,6 +21,7 @@
 #include "nvim/memline.h"
 #include "nvim/move.h"
 #include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/plines.h"
 #include "nvim/pos.h"
 #include "nvim/state.h"
@@ -133,7 +134,7 @@ void init_chartabsize_arg(chartabsize_T *cts, win_T *wp, linenr_T lnum, colnr_T 
 
   if (cts->cts_row >= 0 && wp->w_buffer->b_virt_text_inline > 0) {
     marktree_itr_get(wp->w_buffer->b_marktree, cts->cts_row, 0, cts->cts_iter);
-    mtkey_t mark = marktree_itr_current(cts->cts_iter);
+    MTKey mark = marktree_itr_current(cts->cts_iter);
     if (mark.pos.row == cts->cts_row) {
       cts->cts_has_virt_text = true;
     }
@@ -222,7 +223,7 @@ int win_lbr_chartabsize(chartabsize_T *cts, int *headp)
     int tab_size = size;
     int col = (int)(s - line);
     while (true) {
-      mtkey_t mark = marktree_itr_current(cts->cts_iter);
+      MTKey mark = marktree_itr_current(cts->cts_iter);
       if (mark.pos.row != cts->cts_row || mark.pos.col > col) {
         break;
       } else if (mark.pos.col == col) {
@@ -476,7 +477,7 @@ void getvcol(win_T *wp, pos_T *pos, colnr_T *start, colnr_T *cursor, colnr_T *en
   char *posptr;  // points to char at pos->col
   int incr;
   int head;
-  long *vts = wp->w_buffer->b_p_vts_array;
+  colnr_T *vts = wp->w_buffer->b_p_vts_array;
   int ts = (int)wp->w_buffer->b_p_ts;
 
   colnr_T vcol = 0;

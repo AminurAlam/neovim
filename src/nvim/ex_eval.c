@@ -16,7 +16,6 @@
 #include "nvim/debugger.h"
 #include "nvim/eval.h"
 #include "nvim/eval/typval.h"
-#include "nvim/eval/typval_defs.h"
 #include "nvim/eval/userfunc.h"
 #include "nvim/ex_cmds_defs.h"
 #include "nvim/ex_docmd.h"
@@ -26,12 +25,11 @@
 #include "nvim/globals.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
-#include "nvim/option_defs.h"
+#include "nvim/option_vars.h"
 #include "nvim/pos.h"
 #include "nvim/regexp.h"
 #include "nvim/runtime.h"
 #include "nvim/strings.h"
-#include "nvim/types.h"
 #include "nvim/vim.h"
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS
@@ -157,7 +155,7 @@ int aborted_in_try(void)
 /// When several messages appear in the same command, the first is usually the
 /// most specific one and used as the exception value.  The "severe" flag can be
 /// set to true, if a later but severer message should be used instead.
-bool cause_errthrow(const char *mesg, bool severe, bool *ignore)
+bool cause_errthrow(const char *mesg, bool multiline, bool severe, bool *ignore)
   FUNC_ATTR_NONNULL_ALL
 {
   msglist_T *elem;
@@ -249,6 +247,7 @@ bool cause_errthrow(const char *mesg, bool severe, bool *ignore)
 
       elem = xmalloc(sizeof(msglist_T));
       elem->msg = xstrdup(mesg);
+      elem->multiline = multiline;
       elem->next = NULL;
       elem->throw_msg = NULL;
       *plist = elem;
@@ -496,7 +495,7 @@ static int throw_exception(void *value, except_type_T type, char *cmdname)
     if (debug_break_level > 0 || *p_vfile == NUL) {
       msg_scroll = true;            // always scroll up, don't overwrite
     }
-    smsg(_("Exception thrown: %s"), excp->value);
+    smsg(0, _("Exception thrown: %s"), excp->value);
     msg_puts("\n");  // don't overwrite this either
 
     if (debug_break_level > 0 || *p_vfile == NUL) {
@@ -547,7 +546,7 @@ static void discard_exception(except_T *excp, bool was_finished)
     if (debug_break_level > 0 || *p_vfile == NUL) {
       msg_scroll = true;            // always scroll up, don't overwrite
     }
-    smsg(was_finished ? _("Exception finished: %s") : _("Exception discarded: %s"), excp->value);
+    smsg(0, was_finished ? _("Exception finished: %s") : _("Exception discarded: %s"), excp->value);
     msg_puts("\n");  // don't overwrite this either
     if (debug_break_level > 0 || *p_vfile == NUL) {
       cmdline_row = msg_row;
@@ -614,7 +613,7 @@ static void catch_exception(except_T *excp)
     if (debug_break_level > 0 || *p_vfile == NUL) {
       msg_scroll = true;            // always scroll up, don't overwrite
     }
-    smsg(_("Exception caught: %s"), excp->value);
+    smsg(0, _("Exception caught: %s"), excp->value);
     msg_puts("\n");  // don't overwrite this either
 
     if (debug_break_level > 0 || *p_vfile == NUL) {
@@ -731,7 +730,7 @@ static void report_pending(int action, int pending, void *value)
   }
   no_wait_return++;
   msg_scroll = true;            // always scroll up, don't overwrite
-  smsg(mesg, s);
+  smsg(0, mesg, s);
   msg_puts("\n");  // don't overwrite this either
   cmdline_row = msg_row;
   no_wait_return--;
