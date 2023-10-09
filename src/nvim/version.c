@@ -2773,7 +2773,7 @@ void intro_message(int colon)
   size_t lines_size = ARRAY_SIZE(lines);
   assert(lines_size <= LONG_MAX);
 
-  long blanklines = Rows - ((long)lines_size - 1L);
+  int blanklines = Rows - ((int)lines_size - 1);
 
   // Don't overwrite a statusline.  Depends on 'cmdheight'.
   if (p_ls > 1) {
@@ -2790,7 +2790,7 @@ void intro_message(int colon)
   sponsor = ((sponsor & 2) == 0) - ((sponsor & 4) == 0);
 
   // start displaying the message lines after half of the blank lines
-  long row = blanklines / 2;
+  int row = blanklines / 2;
 
   if (((row >= 2) && (Columns >= 50)) || colon) {
     for (int i = 0; i < (int)ARRAY_SIZE(lines); i++) {
@@ -2838,14 +2838,13 @@ void intro_message(int colon)
   }
 }
 
-static void do_intro_line(long row, char *mesg, int attr)
+static void do_intro_line(int row, char *mesg, int attr)
 {
   char *p;
   int l;
-  int clen;
 
   // Center the message horizontally.
-  long col = vim_strsize(mesg);
+  int col = vim_strsize(mesg);
 
   col = (Columns - col) / 2;
 
@@ -2853,21 +2852,18 @@ static void do_intro_line(long row, char *mesg, int attr)
     col = 0;
   }
 
+  grid_line_start(&default_grid, row);
   // Split up in parts to highlight <> items differently.
   for (p = mesg; *p != NUL; p += l) {
-    clen = 0;
-
     for (l = 0;
          p[l] != NUL && (l == 0 || (p[l] != '<' && p[l - 1] != '>'));
          l++) {
-      clen += ptr2cells(p + l);
       l += utfc_ptr2len(p + l) - 1;
     }
     assert(row <= INT_MAX && col <= INT_MAX);
-    grid_puts(&default_grid, p, l, (int)row, (int)col,
-              *p == '<' ? HL_ATTR(HLF_8) : attr);
-    col += clen;
+    col += grid_line_puts(col, p, l, *p == '<' ? HL_ATTR(HLF_8) : attr);
   }
+  grid_line_flush();
 }
 
 /// ":intro": clear screen, display intro screen and wait for return.

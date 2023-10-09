@@ -526,7 +526,7 @@ buf_T *get_buf_arg(typval_T *arg)
 /// "byte2line(byte)" function
 static void f_byte2line(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
-  long boff = (long)tv_get_number(&argvars[0]) - 1;
+  int boff = (int)tv_get_number(&argvars[0]) - 1;
   if (boff < 0) {
     rettv->vval.v_number = -1;
   } else {
@@ -6887,7 +6887,7 @@ static void f_screenchar(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     c = -1;
   } else {
     char buf[MB_MAXBYTES + 1];
-    grid_getbytes(grid, row, col, buf, NULL);
+    schar_get(buf, grid_getchar(grid, row, col, NULL));
     c = utf_ptr2char(buf);
   }
   rettv->vval.v_number = c;
@@ -6908,7 +6908,7 @@ static void f_screenchars(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   }
 
   char buf[MB_MAXBYTES + 1];
-  grid_getbytes(grid, row, col, buf, NULL);
+  schar_get(buf, grid_getchar(grid, row, col, NULL));
   int pcc[MAX_MCO];
   int c = utfc_ptr2char(buf, pcc);
   int composing_len = 0;
@@ -6953,7 +6953,7 @@ static void f_screenstring(typval_T *argvars, typval_T *rettv, EvalFuncData fptr
   }
 
   char buf[MB_MAXBYTES + 1];
-  grid_getbytes(grid, row, col, buf, NULL);
+  schar_get(buf, grid_getchar(grid, row, col, NULL));
   rettv->vval.v_string = xstrdup(buf);
 }
 
@@ -8238,7 +8238,7 @@ static void f_swapfilelist(typval_T *argvars, typval_T *rettv, EvalFuncData fptr
 static void f_swapinfo(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
   tv_dict_alloc_ret(rettv);
-  get_b0_dict(tv_get_string(argvars), rettv->vval.v_dict);
+  swapfile_dict(tv_get_string(argvars), rettv->vval.v_dict);
 }
 
 /// "swapname(expr)" function
@@ -8710,8 +8710,7 @@ static void f_timer_start(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   if (!callback_from_typval(&callback, &argvars[1])) {
     return;
   }
-  rettv->vval.v_number = (varnumber_T)timer_start((const long)tv_get_number(&argvars[0]), repeat,
-                                                  &callback);
+  rettv->vval.v_number = (varnumber_T)timer_start(tv_get_number(&argvars[0]), repeat, &callback);
 }
 
 /// "timer_stop(timerid)" function

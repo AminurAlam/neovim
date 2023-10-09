@@ -78,7 +78,7 @@ void ex_menu(exarg_T *eap)
   char *arg;
   char *p;
   int i;
-  long pri_tab[MENUDEPTH + 1];
+  int pri_tab[MENUDEPTH + 1];
   TriState enable = kNone;        // kTrue for "menu enable",
                                   // kFalse for "menu disable
   vimmenu_T menuarg;
@@ -129,7 +129,7 @@ void ex_menu(exarg_T *eap)
   }
   if (ascii_iswhite(*p)) {
     for (i = 0; i < MENUDEPTH && !ascii_iswhite(*arg); i++) {
-      pri_tab[i] = getdigits_long(&arg, false, 0);
+      pri_tab[i] = getdigits_int(&arg, false, 0);
       if (pri_tab[i] == 0) {
         pri_tab[i] = 500;
       }
@@ -265,7 +265,7 @@ theend:
 /// @param[out]  menuarg menu entry
 /// @param[] pri_tab priority table
 /// @param[in] call_data Right hand side command
-static int add_menu_path(const char *const menu_path, vimmenu_T *menuarg, const long *const pri_tab,
+static int add_menu_path(const char *const menu_path, vimmenu_T *menuarg, const int *const pri_tab,
                          const char *const call_data)
 {
   char *path_name;
@@ -659,7 +659,7 @@ static dict_T *menu_get_recursive(const vimmenu_T *menu, int modes)
 
   dict_T *dict = tv_dict_alloc();
   tv_dict_add_str(dict, S_LEN("name"), menu->dname);
-  tv_dict_add_nr(dict, S_LEN("priority"), (int)menu->priority);
+  tv_dict_add_nr(dict, S_LEN("priority"), menu->priority);
   tv_dict_add_nr(dict, S_LEN("hidden"), menu_is_hidden(menu->dname));
 
   if (menu->mnemonic) {
@@ -1847,7 +1847,7 @@ static void menuitem_getinfo(const char *menu_name, const vimmenu_T *menu, int m
   if (menu->actext != NULL) {
     tv_dict_add_str(dict, S_LEN("accel"), menu->actext);
   }
-  tv_dict_add_nr(dict, S_LEN("priority"), (int)menu->priority);
+  tv_dict_add_nr(dict, S_LEN("priority"), menu->priority);
   tv_dict_add_str(dict, S_LEN("modes"), get_menu_mode_str(menu->modes));
 
   char buf[NUMBUFLEN];

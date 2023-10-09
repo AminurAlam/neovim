@@ -3142,9 +3142,6 @@ void f_fullcommand(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 
   rettv->v_type = VAR_STRING;
   rettv->vval.v_string = NULL;
-  if (name == NULL) {
-    return;
-  }
 
   while (*name == ':') {
     name++;
@@ -5911,7 +5908,7 @@ static void ex_submagic(exarg_T *eap)
 }
 
 /// ":smagic" and ":snomagic" preview callback.
-static int ex_submagic_preview(exarg_T *eap, long cmdpreview_ns, handle_T cmdpreview_bufnr)
+static int ex_submagic_preview(exarg_T *eap, int cmdpreview_ns, handle_T cmdpreview_bufnr)
 {
   const optmagic_T saved = magic_overruled;
 
@@ -6044,7 +6041,7 @@ static void ex_redo(exarg_T *eap)
 /// ":earlier" and ":later".
 static void ex_later(exarg_T *eap)
 {
-  long count = 0;
+  int count = 0;
   bool sec = false;
   bool file = false;
   char *p = eap->arg;
@@ -6052,7 +6049,7 @@ static void ex_later(exarg_T *eap)
   if (*p == NUL) {
     count = 1;
   } else if (isdigit((uint8_t)(*p))) {
-    count = getdigits_long(&p, false, 0);
+    count = getdigits_int(&p, false, 0);
     switch (*p) {
     case 's':
       p++; sec = true; break;
