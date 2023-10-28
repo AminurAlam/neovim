@@ -1878,8 +1878,8 @@ void clear_showcmd(void)
       char *const saved_w_sbr = curwin->w_p_sbr;
 
       // Make 'sbr' empty for a moment to get the correct size.
-      p_sbr = empty_option;
-      curwin->w_p_sbr = empty_option;
+      p_sbr = empty_string_option;
+      curwin->w_p_sbr = empty_string_option;
       getvcols(curwin, &curwin->w_cursor, &VIsual, &leftcol, &rightcol);
       p_sbr = saved_sbr;
       curwin->w_p_sbr = saved_w_sbr;
@@ -5724,6 +5724,8 @@ static void n_opencmd(cmdarg_T *cap)
     (void)hasFolding(curwin->w_cursor.lnum,
                      NULL, &curwin->w_cursor.lnum);
   }
+  // trigger TextChangedI for the 'o/O' command
+  curbuf->b_last_changedtick_i = buf_get_changedtick(curbuf);
   if (u_save(curwin->w_cursor.lnum - (cap->cmdchar == 'O' ? 1 : 0),
              curwin->w_cursor.lnum + (cap->cmdchar == 'o' ? 1 : 0))
       && open_line(cap->cmdchar == 'O' ? BACKWARD : FORWARD,
@@ -6265,6 +6267,11 @@ static void invoke_edit(cmdarg_T *cap, int repl, int cmd, int startln)
   // Always reset "restart_edit", this is not a restarted edit.
   restart_edit = 0;
 
+  // Reset Changedtick_i, so that TextChangedI will only be triggered for stuff
+  // from insert mode, for 'o/O' this has already been done in n_opencmd
+  if (cap->cmdchar != 'O' && cap->cmdchar != 'o') {
+    curbuf->b_last_changedtick_i = buf_get_changedtick(curbuf);
+  }
   if (edit(cmd, startln, cap->count1)) {
     cap->retval |= CA_COMMAND_BUSY;
   }

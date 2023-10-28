@@ -4034,6 +4034,8 @@ M.funcs = {
       	wincol		column inside "winid"
       	line		text line inside "winid"
       	column		text column inside "winid"
+      	coladd		offset (in screen columns) from the
+      			start of the clicked char
       All numbers are 1-based.
 
       If not over a window, e.g. when in the command line, then only
@@ -4333,7 +4335,7 @@ M.funcs = {
       		Note that this is a copy, the value of
       		script-local variables cannot be changed using
       		this dictionary.
-          version	Vimscript version, always 1
+          version	Vim script version, always 1
 
       Examples: >vim
       	echo getscriptinfo({'name': 'myscript'})
@@ -9636,6 +9638,7 @@ M.funcs = {
     name = 'shiftwidth',
     params = { { 'col', 'integer' } },
     signature = 'shiftwidth([{col}])',
+    returns = 'integer',
   },
   sign_define = {
     args = { 1, 2 },
@@ -11802,15 +11805,18 @@ M.funcs = {
     desc = [=[
       Return {text} as a String where any character in {mask} is
       removed from the beginning and/or end of {text}.
-      If {mask} is not given, {mask} is all characters up to 0x20,
-      which includes Tab, space, NL and CR, plus the non-breaking
-      space character 0xa0.
+
+      If {mask} is not given, or is an empty string, {mask} is all
+      characters up to 0x20, which includes Tab, space, NL and CR,
+      plus the non-breaking space character 0xa0.
+
       The optional {dir} argument specifies where to remove the
       characters:
       	0	remove from the beginning and end of {text}
       	1	remove only at the beginning of {text}
       	2	remove only at the end of {text}
       When omitted both ends are trimmed.
+
       This function deals with multibyte characters properly.
       Returns an empty string on error.
 
@@ -12105,6 +12111,8 @@ M.funcs = {
       The result is a Number, which is the byte index of the
       character in window {winid} at buffer line {lnum} and virtual
       column {col}.
+
+      If buffer line {lnum} is an empty line, 0 is returned.
 
       If {col} is greater than the last virtual column in line
       {lnum}, then the byte index of the character at the last

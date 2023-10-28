@@ -482,7 +482,7 @@ buf_T *tv_get_buf(typval_T *tv, int curtab_only)
   int save_magic = p_magic;
   p_magic = true;
   char *save_cpo = p_cpo;
-  p_cpo = empty_option;
+  p_cpo = empty_string_option;
 
   buf_T *buf = buflist_findnr(buflist_findpat(name, name + strlen(name),
                                               true, false, curtab_only));
@@ -1733,7 +1733,7 @@ static void f_expand(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   char *p_csl_save = p_csl;
 
   // avoid using 'completeslash' here
-  p_csl = empty_option;
+  p_csl = empty_string_option;
 #endif
 
   rettv->v_type = VAR_STRING;
@@ -2502,7 +2502,7 @@ static void f_getcwd(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     [kCdScopeTabpage] = 0,  // Number of tab to look at.
   };
 
-  char *cwd  = NULL;    // Current working directory to print
+  char *cwd = NULL;    // Current working directory to print
   char *from = NULL;    // The original string to copy
 
   tabpage_T *tp = curtab;  // The tabpage to look at.
@@ -3283,7 +3283,7 @@ static void f_haslocaldir(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     [kCdScopeTabpage] = 0,  // Number of tab to look at.
   };
 
-  tabpage_T *tp  = curtab;  // The tabpage to look at.
+  tabpage_T *tp = curtab;  // The tabpage to look at.
   win_T *win = curwin;  // The window to look at.
 
   rettv->v_type = VAR_NUMBER;
@@ -4518,7 +4518,7 @@ static void find_some_match(typval_T *const argvars, typval_T *const rettv,
 
   // Make 'cpoptions' empty, the 'l' flag should not be used here.
   char *save_cpo = p_cpo;
-  p_cpo = empty_option;
+  p_cpo = empty_string_option;
 
   rettv->vval.v_number = -1;
   switch (type) {
@@ -4992,9 +4992,10 @@ static int msgpackparse_convert_item(const msgpack_object data, const msgpack_un
     tv_list_append_owned_tv(ret_list, tv);
     return OK;
   }
-  default:
+  case MSGPACK_UNPACK_EXTRA_BYTES:
     abort();
   }
+  UNREACHABLE;
 }
 
 static void msgpackparse_unpack_list(const list_T *const list, list_T *const ret_list)
@@ -5259,7 +5260,7 @@ static void f_prompt_setinterrupt(typval_T *argvars, typval_T *rettv, EvalFuncDa
   }
 
   callback_free(&buf->b_prompt_interrupt);
-  buf->b_prompt_interrupt= interrupt_callback;
+  buf->b_prompt_interrupt = interrupt_callback;
 }
 
 /// "prompt_getprompt({buffer})" function
@@ -5590,9 +5591,9 @@ static void read_file_or_blob(typval_T *argvars, typval_T *rettv, bool always_bl
   char buf[(IOSIZE/256) * 256];    // rounded to avoid odd + 1
   int io_size = sizeof(buf);
   char *prev = NULL;               // previously read bytes, if any
-  ptrdiff_t prevlen  = 0;               // length of data in prev
+  ptrdiff_t prevlen = 0;               // length of data in prev
   ptrdiff_t prevsize = 0;               // size of prev buffer
-  int64_t maxline  = MAXLNUM;
+  int64_t maxline = MAXLNUM;
   off_T offset = 0;
   off_T size = -1;
 
@@ -5652,7 +5653,7 @@ static void read_file_or_blob(typval_T *argvars, typval_T *rettv, bool always_bl
          p < buf + readlen || (readlen <= 0 && (prevlen > 0 || binary));
          p++) {
       if (readlen <= 0 || *p == '\n') {
-        char *s  = NULL;
+        char *s = NULL;
         size_t len = (size_t)(p - start);
 
         // Finished a line.  Remove CRs before NL.
@@ -5755,7 +5756,7 @@ static void read_file_or_blob(typval_T *argvars, typval_T *rettv, bool always_bl
           prevsize = p - start;
         } else {
           ptrdiff_t grow50pc = (prevsize * 3) / 2;
-          ptrdiff_t growmin  = (p - start) * 2 + prevlen;
+          ptrdiff_t growmin = (p - start) * 2 + prevlen;
           prevsize = grow50pc > growmin ? grow50pc : growmin;
         }
         prev = xrealloc(prev, (size_t)prevsize);
@@ -6099,13 +6100,13 @@ static void f_resolve(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
         }
 
         // Ensure that the result will have a trailing path separator
-        // if the argument has one. */
+        // if the argument has one.
         if (remain == NULL && has_trailing_pathsep) {
           add_pathsep(buf);
         }
 
         // Separate the first path component in the link value and
-        // concatenate the remainders. */
+        // concatenate the remainders.
         q = (char *)path_next_component(vim_ispathsep(*buf) ? buf + 1 : buf);
         if (*q != NUL) {
           cpy = remain;
@@ -6119,7 +6120,7 @@ static void f_resolve(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
         q = path_tail(p);
         if (q > p && *q == NUL) {
           // Ignore trailing path separator.
-          q[-1] = NUL;
+          p[q - p - 1] = NUL;
           q = path_tail(p);
         }
         if (q > p && !path_is_absolute(buf)) {
@@ -7109,7 +7110,7 @@ long do_searchpair(const char *spat, const char *mpat, const char *epat, int dir
 
   // Make 'cpoptions' empty, the 'l' flag should not be used here.
   char *save_cpo = p_cpo;
-  p_cpo = empty_option;
+  p_cpo = empty_string_option;
 
   // Set the time limit, if there is one.
   proftime_T tm = profile_setlimit(time_limit);
@@ -7235,7 +7236,7 @@ long do_searchpair(const char *spat, const char *mpat, const char *epat, int dir
 
   xfree(pat2);
   xfree(pat3);
-  if (p_cpo == empty_option) {
+  if (p_cpo == empty_string_option) {
     p_cpo = save_cpo;
   } else {
     // Darn, evaluating the {skip} expression changed the value.
@@ -7436,6 +7437,13 @@ static void f_setenv(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   char namebuf[NUMBUFLEN];
   char valbuf[NUMBUFLEN];
   const char *name = tv_get_string_buf(&argvars[0], namebuf);
+
+  // seting an environment variable may be dangerous, e.g. you could
+  // setenv GCONV_PATH=/tmp and then have iconv() unexpectedly call
+  // a shell command using some shared library:
+  if (check_secure()) {
+    return;
+  }
 
   if (argvars[1].v_type == VAR_SPECIAL
       && argvars[1].vval.v_special == kSpecialVarNull) {
@@ -7967,7 +7975,7 @@ static void f_split(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 
   // Make 'cpoptions' empty, the 'l' flag should not be used here.
   char *save_cpo = p_cpo;
-  p_cpo = empty_option;
+  p_cpo = empty_string_option;
 
   const char *str = tv_get_string(&argvars[0]);
   const char *pat = NULL;
@@ -8638,8 +8646,10 @@ static void f_termopen(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
                INTEGER_OBJ(pid), false, false, &err);
   api_clear_error(&err);
 
+  channel_incref(chan);
   channel_terminal_open(curbuf, chan);
   channel_create_event(chan, NULL);
+  channel_decref(chan);
 }
 
 /// "timer_info([timer])" function

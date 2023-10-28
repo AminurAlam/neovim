@@ -592,8 +592,10 @@ end
 ---                       * spacing: (number) Amount of empty spaces inserted at the beginning
 ---                                  of the virtual text.
 ---                       * prefix: (string or function) prepend diagnostic message with prefix.
----                                 If a function, it must have the signature (diagnostic) -> string,
----                                 where {diagnostic} is of type |diagnostic-structure|. This can be
+---                                 If a function, it must have the signature (diagnostic, i, total)
+---                                 -> string, where {diagnostic} is of type |diagnostic-structure|,
+---                                 {i} is the index of the diagnostic being evaluated, and {total}
+---                                 is the total number of diagnostics for the line. This can be
 ---                                 used to render diagnostic symbols or error codes.
 ---                       * suffix: (string or function) Append diagnostic message with suffix.
 ---                                 If a function, it must have the signature (diagnostic) ->
@@ -652,16 +654,14 @@ function M.config(opts, namespace)
 
   if namespace then
     for bufnr, v in pairs(diagnostic_cache) do
-      if api.nvim_buf_is_loaded(bufnr) and v[namespace] then
+      if v[namespace] then
         M.show(namespace, bufnr)
       end
     end
   else
     for bufnr, v in pairs(diagnostic_cache) do
-      if api.nvim_buf_is_loaded(bufnr) then
-        for ns in pairs(v) do
-          M.show(ns, bufnr)
-        end
+      for ns in pairs(v) do
+        M.show(ns, bufnr)
       end
     end
   end
@@ -693,9 +693,7 @@ function M.set(namespace, bufnr, diagnostics, opts)
     set_diagnostic_cache(namespace, bufnr, diagnostics)
   end
 
-  if api.nvim_buf_is_loaded(bufnr) then
-    M.show(namespace, bufnr, nil, opts)
-  end
+  M.show(namespace, bufnr, nil, opts)
 
   api.nvim_exec_autocmds('DiagnosticChanged', {
     modeline = false,
@@ -928,6 +926,10 @@ M.handlers.underline = {
     bufnr = get_bufnr(bufnr)
     opts = opts or {}
 
+    if not vim.api.nvim_buf_is_loaded(bufnr) then
+      return
+    end
+
     if opts.underline and opts.underline.severity then
       diagnostics = filter_by_severity(opts.underline.severity, diagnostics)
     end
@@ -993,6 +995,10 @@ M.handlers.virtual_text = {
 
     bufnr = get_bufnr(bufnr)
     opts = opts or {}
+
+    if not vim.api.nvim_buf_is_loaded(bufnr) then
+      return
+    end
 
     local severity
     if opts.virtual_text then
@@ -1068,7 +1074,7 @@ function M._get_virt_text_chunks(line_diags, opts)
   for i = 1, #line_diags do
     local resolved_prefix = prefix
     if type(prefix) == 'function' then
-      resolved_prefix = prefix(line_diags[i]) or ''
+      resolved_prefix = prefix(line_diags[i], i, #line_diags) or ''
     end
     table.insert(
       virt_texts,

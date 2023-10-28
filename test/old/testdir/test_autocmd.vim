@@ -3478,6 +3478,35 @@ func Test_Changed_ChangedI()
   " call assert_equal('N4', g:autocmd_n)
   call assert_equal('I3', g:autocmd_i)
 
+  " TextChangedI should only trigger if change was done in Insert mode
+  let g:autocmd_i = ''
+  call feedkeys("yypi\<esc>", 'tnix')
+  call assert_equal('', g:autocmd_i)
+
+  " TextChanged should only trigger if change was done in Normal mode
+  let g:autocmd_n = ''
+  call feedkeys("ibar\<esc>", 'tnix')
+  call assert_equal('', g:autocmd_n)
+
+  " If change is a mix of Normal and Insert modes, TextChangedI should trigger
+  func s:validate_mixed_textchangedi(keys)
+    call feedkeys("ifoo\<esc>", 'tnix')
+    let g:autocmd_i = ''
+    let g:autocmd_n = ''
+    call feedkeys(a:keys, 'tnix')
+    call assert_notequal('', g:autocmd_i)
+    call assert_equal('', g:autocmd_n)
+  endfunc
+
+  call s:validate_mixed_textchangedi("o\<esc>")
+  call s:validate_mixed_textchangedi("O\<esc>")
+  call s:validate_mixed_textchangedi("ciw\<esc>")
+  call s:validate_mixed_textchangedi("cc\<esc>")
+  call s:validate_mixed_textchangedi("C\<esc>")
+  call s:validate_mixed_textchangedi("s\<esc>")
+  call s:validate_mixed_textchangedi("S\<esc>")
+
+
   " CleanUp
   call test_override("char_avail", 0)
   au! TextChanged  <buffer>

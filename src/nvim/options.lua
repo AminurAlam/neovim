@@ -1370,6 +1370,7 @@ return {
         	|i_CTRL-X_CTRL-D|
         ]	tag completion
         t	same as "]"
+        f	scan the buffer names (as opposed to buffer contents)
 
         Unloaded buffers are not loaded, thus their autocmds |:autocmd| are
         not executed, this may lead to unexpected completions from some files
@@ -2796,7 +2797,6 @@ return {
         'S' flag in 'cpoptions'.
         Only normal file name characters can be used, `/\*?[|<>` are illegal.
       ]=],
-      expand = true,
       full_name = 'filetype',
       noglob = true,
       normal_fname_chars = true,
@@ -2932,7 +2932,7 @@ return {
             "auto":       resize to the minimum amount of folds to display.
             "auto:[1-9]": resize to accommodate multiple folds up to the
         		  selected level
-            0:            to disable foldcolumn
+            "0":          to disable foldcolumn
             "[1-9]":      to display a fixed number of columns
         See |folding|.
       ]=],
@@ -3970,8 +3970,9 @@ return {
       cb = 'did_set_ignorecase',
       defaults = { if_true = false },
       desc = [=[
-        Ignore case in search patterns, completion, and when searching the tags file.
-        See also 'smartcase' and 'tagcase'.
+        Ignore case in search patterns, |cmdline-completion|, when
+        searching in the tags file, and |expr-==|.
+        Also see 'smartcase' and 'tagcase'.
         Can be overruled by using "\c" or "\C" in the pattern, see
         |/ignorecase|.
       ]=],
@@ -5153,6 +5154,7 @@ return {
         Increasing this limit above 200 also changes the maximum for Ex
         command recursion, see |E169|.
         See also |:function|.
+        Also used for maximum depth of callback functions.
       ]=],
       full_name = 'maxfuncdepth',
       scope = { 'global' },
@@ -5926,6 +5928,10 @@ return {
         option may be relative or absolute.
         - Use commas to separate directory names: >
         	:set path=.,/usr/local/include,/usr/include
+        <	- Spaces can also be used to separate directory names.  To have a
+          space in a directory name, precede it with an extra backslash, and
+          escape the space: >
+        	:set path=.,/dir/with\\\ space
         <	- To include a comma in a directory name precede it with an extra
           backslash: >
         	:set path=.,/dir/with\\,comma
@@ -6818,6 +6824,7 @@ return {
     },
     {
       abbreviation = 'sd',
+      cb = 'did_set_shada',
       defaults = {
         if_true = "!,'100,<50,s10,h",
         doc = [[for
@@ -8359,7 +8366,7 @@ return {
         This option controls the behavior when switching between buffers.
         This option is checked, when
         - jumping to errors with the |quickfix| commands (|:cc|, |:cn|, |:cp|,
-          etc.)
+          etc.).
         - jumping to a tag using the |:stag| command.
         - opening a file using the |CTRL-W_f| or |CTRL-W_F| command.
         - jumping to a buffer using a buffer split command (e.g.  |:sbuffer|,
@@ -8675,8 +8682,8 @@ return {
       deny_duplicates = true,
       desc = [=[
         Filenames for the tag command, separated by spaces or commas.  To
-        include a space or comma in a file name, precede it with a backslash
-        (see |option-backslash| about including spaces and backslashes).
+        include a space or comma in a file name, precede it with backslashes
+        (see |option-backslash| about including spaces/commas and backslashes).
         When a file name starts with "./", the '.' is replaced with the path
         of the current file.  But only when the 'd' flag is not included in
         'cpoptions'.  Environment variables are expanded |:set_env|.  Also see
@@ -9466,6 +9473,7 @@ return {
     },
     {
       abbreviation = 'wc',
+      cb = 'did_set_wildchar',
       defaults = {
         if_true = imacros('TAB'),
         doc = '<Tab>',
@@ -9477,6 +9485,8 @@ return {
         The character is not recognized when used inside a macro.  See
         'wildcharm' for that.
         Some keys will not work, such as CTRL-C, <CR> and Enter.
+        <Esc> can be used, but hitting it twice in a row will still exit
+        command-line as a failsafe measure.
         Although 'wc' is a number option, you can set it to a special key: >
         	:set wc=<Tab>
         <
@@ -9489,6 +9499,7 @@ return {
     },
     {
       abbreviation = 'wcm',
+      cb = 'did_set_wildchar',
       defaults = { if_true = 0 },
       desc = [=[
         'wildcharm' works exactly like 'wildchar', except that it is
@@ -9564,18 +9575,21 @@ return {
         a completion.
 
         While the menu is active these keys have special meanings:
-
-        CTRL-Y		- accept the currently selected match and stop
-        		  completion.
-        CTRL-E		- end completion, go back to what was there before
-        		  selecting a match.
+        CTRL-P		- go to the previous entry
+        CTRL-N		- go to the next entry
         <Left> <Right>	- select previous/next match (like CTRL-P/CTRL-N)
+        <PageUp>	- select a match several entries back
+        <PageDown>	- select a match several entries further
+        <Up>		- in filename/menu name completion: move up into
+        		  parent directory or parent menu.
         <Down>		- in filename/menu name completion: move into a
         		  subdirectory or submenu.
         <CR>		- in menu completion, when the cursor is just after a
         		  dot: move into a submenu.
-        <Up>		- in filename/menu name completion: move up into
-        		  parent directory or parent menu.
+        CTRL-E		- end completion, go back to what was there before
+        		  selecting a match.
+        CTRL-Y		- accept the currently selected match and stop
+        		  completion.
 
         If you want <Left> and <Right> to move the cursor instead of selecting
         a different match, use this: >

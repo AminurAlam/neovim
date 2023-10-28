@@ -189,7 +189,9 @@ lsp.client_errors = tbl_extend(
   'error',
   lsp_rpc.client_errors,
   vim.tbl_add_reverse_lookup({
-    ON_INIT_CALLBACK_ERROR = table.maxn(lsp_rpc.client_errors) + 1,
+    BEFORE_INIT_CALLBACK_ERROR = table.maxn(lsp_rpc.client_errors) + 1,
+    ON_INIT_CALLBACK_ERROR = table.maxn(lsp_rpc.client_errors) + 2,
+    ON_ATTACH_ERROR = table.maxn(lsp_rpc.client_errors) + 3,
   })
 )
 
@@ -1172,6 +1174,16 @@ function lsp.start_client(config)
     return nil, lsp.rpc_response_error(protocol.ErrorCodes.MethodNotFound)
   end
 
+  --- Logs the given error to the LSP log and to the error buffer.
+  --- @param code integer Error code
+  --- @param err any Error arguments
+  local function write_error(code, err)
+    if log.error() then
+      log.error(log_prefix, 'on_error', { code = lsp.client_errors[code], err = err })
+    end
+    err_message(log_prefix, ': Error ', lsp.client_errors[code], ': ', vim.inspect(err))
+  end
+
   ---@private
   --- Invoked when the client operation throws an error.
   ---
@@ -1180,10 +1192,7 @@ function lsp.start_client(config)
   ---@see vim.lsp.rpc.client_errors for possible errors. Use
   ---`vim.lsp.rpc.client_errors[code]` to get a human-friendly name.
   function dispatch.on_error(code, err)
-    if log.error() then
-      log.error(log_prefix, 'on_error', { code = lsp.client_errors[code], err = err })
-    end
-    err_message(log_prefix, ': Error ', lsp.client_errors[code], ': ', vim.inspect(err))
+    write_error(code, err)
     if config.on_error then
       local status, usererr = pcall(config.on_error, code, err)
       if not status then
@@ -1391,8 +1400,10 @@ function lsp.start_client(config)
       trace = valid_traces[config.trace] or 'off',
     }
     if config.before_init then
-      -- TODO(ashkan) handle errors here.
-      pcall(config.before_init, initialize_params, config)
+      local status, err = pcall(config.before_init, initialize_params, config)
+      if not status then
+        write_error(lsp.client_errors.BEFORE_INIT_CALLBACK_ERROR, err)
+      end
     end
 
     --- @param method string
@@ -1440,7 +1451,7 @@ function lsp.start_client(config)
       if config.on_init then
         local status, err = pcall(config.on_init, client, result)
         if not status then
-          pcall(handlers.on_error, lsp.client_errors.ON_INIT_CALLBACK_ERROR, err)
+          write_error(lsp.client_errors.ON_INIT_CALLBACK_ERROR, err)
         end
       end
       local _ = log.info()
@@ -1714,8 +1725,10 @@ function lsp.start_client(config)
     })
 
     if config.on_attach then
-      -- TODO(ashkan) handle errors.
-      pcall(config.on_attach, client, bufnr)
+      local status, err = pcall(config.on_attach, client, bufnr)
+      if not status then
+        write_error(lsp.client_errors.ON_ATTACH_ERROR, err)
+      end
     end
 
     -- schedule the initialization of semantic tokens to give the above
@@ -2260,24 +2273,6 @@ function lsp.buf_notify(bufnr, method, params)
   return resp
 end
 
----@private
-local function adjust_start_col(lnum, line, items, encoding)
-  local min_start_char = nil
-  for _, item in pairs(items) do
-    if item.textEdit and item.textEdit.range.start.line == lnum - 1 then
-      if min_start_char and min_start_char ~= item.textEdit.range.start.character then
-        return nil
-      end
-      min_start_char = item.textEdit.range.start.character
-    end
-  end
-  if min_start_char then
-    return util._str_byteindex_enc(line, min_start_char, encoding)
-  else
-    return nil
-  end
-end
-
 --- Implements 'omnifunc' compatible LSP completion.
 ---
 ---@see |complete-functions|
@@ -2294,82 +2289,7 @@ function lsp.omnifunc(findstart, base)
   if log.debug() then
     log.debug('omnifunc.findstart', { findstart = findstart, base = base })
   end
-
-  local bufnr = resolve_bufnr()
-  local clients = lsp.get_clients({ bufnr = bufnr, method = ms.textDocument_completion })
-  local remaining = #clients
-  if remaining == 0 then
-    return findstart == 1 and -1 or {}
-  end
-
-  -- Then, perform standard completion request
-  if log.info() then
-    log.info('base ', base)
-  end
-
-  local win = api.nvim_get_current_win()
-  local pos = api.nvim_win_get_cursor(win)
-  local line = api.nvim_get_current_line()
-  local line_to_cursor = line:sub(1, pos[2])
-  local _ = log.trace() and log.trace('omnifunc.line', pos, line)
-
-  -- Get the start position of the current keyword
-  local match_pos = vim.fn.match(line_to_cursor, '\\k*$') + 1
-  local items = {}
-
-  local startbyte
-
-  local function on_done()
-    local mode = api.nvim_get_mode()['mode']
-    if mode == 'i' or mode == 'ic' then
-      vim.fn.complete(startbyte or match_pos, items)
-    end
-  end
-
-  for _, client in ipairs(clients) do
-    local params = util.make_position_params(win, client.offset_encoding)
-    client.request(ms.textDocument_completion, params, function(err, result)
-      if err then
-        log.warn(err.message)
-      end
-      if result and vim.fn.mode() == 'i' then
-        -- Completion response items may be relative to a position different than `textMatch`.
-        -- Concrete example, with sumneko/lua-language-server:
-        --
-        -- require('plenary.asy|
-        --         ▲       ▲   ▲
-        --         │       │   └── cursor_pos: 20
-        --         │       └────── textMatch: 17
-        --         └────────────── textEdit.range.start.character: 9
-        --                                 .newText = 'plenary.async'
-        --                  ^^^
-        --                  prefix (We'd remove everything not starting with `asy`,
-        --                  so we'd eliminate the `plenary.async` result
-        --
-        -- `adjust_start_col` is used to prefer the language server boundary.
-        --
-        local encoding = client.offset_encoding
-        local candidates = util.extract_completion_items(result)
-        local curstartbyte = adjust_start_col(pos[1], line, candidates, encoding)
-        if startbyte == nil then
-          startbyte = curstartbyte
-        elseif curstartbyte ~= nil and curstartbyte ~= startbyte then
-          startbyte = match_pos
-        end
-        local prefix = startbyte and line:sub(startbyte + 1) or line_to_cursor:sub(match_pos)
-        local matches = util.text_document_completion_list_to_complete_items(result, prefix)
-        vim.list_extend(items, matches)
-      end
-      remaining = remaining - 1
-      if remaining == 0 then
-        vim.schedule(on_done)
-      end
-    end, bufnr)
-  end
-
-  -- Return -2 to signal that we should continue completion so that we can
-  -- async complete.
-  return -2
+  return require('vim.lsp._completion').omnifunc(findstart, base)
 end
 
 --- Provides an interface between the built-in client and a `formatexpr` function.

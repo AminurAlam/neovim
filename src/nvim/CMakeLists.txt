@@ -28,7 +28,7 @@ target_link_libraries(main_lib INTERFACE ${LUV_LIBRARY})
 find_package(Iconv REQUIRED)
 find_package(Lpeg REQUIRED)
 find_package(Libtermkey 0.22 REQUIRED)
-find_package(Libvterm 0.3 REQUIRED)
+find_package(Libvterm 0.3.3 REQUIRED)
 find_package(Msgpack 1.0.0 REQUIRED)
 find_package(Treesitter 0.20.8 REQUIRED)
 find_package(Unibilium 2.0 REQUIRED)
@@ -90,7 +90,7 @@ if(MSVC)
   target_compile_options(main_lib INTERFACE -W3)
 
   # Disable warnings that give too many false positives.
-  target_compile_options(main_lib INTERFACE -wd4311 -wd4146 -wd4003)
+  target_compile_options(main_lib INTERFACE -wd4311 -wd4146 -wd4003 -wd4715)
   target_compile_definitions(main_lib INTERFACE _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_DEPRECATE)
 
   target_sources(main_lib INTERFACE ${CMAKE_CURRENT_LIST_DIR}/os/nvim.manifest)
@@ -821,10 +821,32 @@ add_glob_target(
   FILES ${NVIM_SOURCES} ${NVIM_HEADERS}
   FLAGS --quiet
   EXCLUDE ${EXCLUDE_CLANG_TIDY})
+
+# These are the same warnings as https://neovim.io/doc/reports/clang/. The
+# checks we ignore are meant to be removed eventually, but we can only do so
+# after we properly fix the problems without breaking CI.
+add_glob_target(
+  TARGET clang-analyzer
+  COMMAND ${CLANG_TIDY_PRG}
+  FILES ${NVIM_SOURCES} ${NVIM_HEADERS}
+  FLAGS --quiet
+  --checks='
+  -*,
+  clang-analyzer-*,
+  -clang-analyzer-core.NonNullParamChecker,
+  -clang-analyzer-core.NullDereference,
+  -clang-analyzer-core.UndefinedBinaryOperatorResult,
+  -clang-analyzer-core.uninitialized.Assign,
+  -clang-analyzer-optin.performance.Padding,
+  -clang-analyzer-security.insecureAPI.strcpy,
+  '
+  EXCLUDE ${EXCLUDE_CLANG_TIDY})
+
 add_custom_target(copy_compile_commands
   COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/compile_commands.json ${PROJECT_SOURCE_DIR}/compile_commands.json)
 add_dependencies(copy_compile_commands nvim)
 add_dependencies(clang-tidy copy_compile_commands)
+add_dependencies(clang-analyzer copy_compile_commands)
 
 if(CI_BUILD)
   set(LINT_OUTPUT_FORMAT gh_action)
@@ -920,7 +942,7 @@ add_custom_command(
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 
-add_custom_target(doc
-  DEPENDS ${VIMDOC_FILES} ${GEN_EVAL_FILES}
-)
-
+add_custom_target(doc-eval DEPENDS ${GEN_EVAL_FILES})
+add_custom_target(doc-vim DEPENDS ${VIMDOC_FILES})
+add_custom_target(doc)
+add_dependencies(doc doc-vim doc-eval)

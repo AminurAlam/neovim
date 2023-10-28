@@ -4,6 +4,7 @@ local exec = helpers.exec
 local command = helpers.command
 local feed = helpers.feed
 local eq = helpers.eq
+local neq = helpers.neq
 local eval = helpers.eval
 local poke_eventloop = helpers.poke_eventloop
 
@@ -25,6 +26,7 @@ it('TextChangedI and TextChangedP autocommands', function()
   feed('o')
   poke_eventloop()
   feed('<esc>')
+  -- TextChangedI triggers only if text is actually changed in Insert mode
   eq('I', eval('g:autocmd'))
 
   command([[let g:autocmd = '']])
@@ -117,7 +119,7 @@ it('TextChangedI with setline()', function()
 end)
 
 -- oldtest: Test_Changed_ChangedI()
-it('TextChanged is triggerd after TextChangedI', function()
+it('TextChangedI and TextChanged', function()
   exec([[
     let [g:autocmd_i, g:autocmd_n] = ['','']
 
@@ -141,10 +143,40 @@ it('TextChanged is triggerd after TextChangedI', function()
   feed('o')
   poke_eventloop()
   feed('<esc>')
-  eq('N5', eval('g:autocmd_n'))
+  eq('', eval('g:autocmd_n'))
   eq('I5', eval('g:autocmd_i'))
 
-  command([[call feedkeys("yyp", 'tnix')]])
+  feed('yyp')
   eq('N6', eval('g:autocmd_n'))
   eq('I5', eval('g:autocmd_i'))
+
+  -- TextChangedI should only trigger if change was done in Insert mode
+  command([[let g:autocmd_i = '']])
+  feed('yypi<esc>')
+  eq('', eval('g:autocmd_i'))
+
+  -- TextChanged should only trigger if change was done in Normal mode
+  command([[let g:autocmd_n = '']])
+  feed('ibar<esc>')
+  eq('', eval('g:autocmd_n'))
+
+  local function validate_mixed_textchangedi(keys)
+    feed('ifoo<esc>')
+    command([[let g:autocmd_i = '']])
+    command([[let g:autocmd_n = '']])
+    for _, s in ipairs(keys) do
+      feed(s)
+      poke_eventloop()
+    end
+    neq('', eval('g:autocmd_i'))
+    eq('', eval('g:autocmd_n'))
+  end
+
+  validate_mixed_textchangedi({'o', '<esc>'})
+  validate_mixed_textchangedi({'O', '<esc>'})
+  validate_mixed_textchangedi({'ciw', '<esc>'})
+  validate_mixed_textchangedi({'cc', '<esc>'})
+  validate_mixed_textchangedi({'C', '<esc>'})
+  validate_mixed_textchangedi({'s', '<esc>'})
+  validate_mixed_textchangedi({'S', '<esc>'})
 end)

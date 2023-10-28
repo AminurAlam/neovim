@@ -168,9 +168,6 @@ bool channel_close(uint64_t id, ChannelPart part, const char **error)
       channel_decref(chan);
     }
     break;
-
-  default:
-    abort();
   }
 
   return true;
@@ -789,9 +786,8 @@ void channel_terminal_open(buf_T *buf, Channel *chan)
   topts.resize_cb = term_resize;
   topts.close_cb = term_close;
   buf->b_p_channel = (OptInt)chan->id;  // 'channel' option
-  Terminal *term = terminal_open(buf, topts);
-  chan->term = term;
   channel_incref(chan);
+  terminal_open(&chan->term, buf, topts);
 }
 
 static void term_write(char *buf, size_t size, void *data)
@@ -917,9 +913,6 @@ Dictionary channel_info(uint64_t id)
   case kChannelStreamSocket:
     stream_desc = "socket";
     break;
-
-  default:
-    abort();
   }
   PUT(info, "stream", CSTR_TO_OBJ(stream_desc));
 

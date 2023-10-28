@@ -1467,14 +1467,22 @@ char *get_lval(char *const name, typval_T *const rettv, lval_T *const lp, const 
       }
       return NULL;
     }
-    if (!(lp->ll_tv->v_type == VAR_LIST && lp->ll_tv->vval.v_list != NULL)
-        && !(lp->ll_tv->v_type == VAR_DICT && lp->ll_tv->vval.v_dict != NULL)
-        && !(lp->ll_tv->v_type == VAR_BLOB && lp->ll_tv->vval.v_blob != NULL)) {
+    if (lp->ll_tv->v_type != VAR_LIST
+        && lp->ll_tv->v_type != VAR_DICT
+        && lp->ll_tv->v_type != VAR_BLOB) {
       if (!quiet) {
         emsg(_("E689: Can only index a List, Dictionary or Blob"));
       }
       return NULL;
     }
+
+    // a NULL list/blob works like an empty list/blob, allocate one now.
+    if (lp->ll_tv->v_type == VAR_LIST && lp->ll_tv->vval.v_list == NULL) {
+      tv_list_alloc_ret(lp->ll_tv, kListLenUnknown);
+    } else if (lp->ll_tv->v_type == VAR_BLOB && lp->ll_tv->vval.v_blob == NULL) {
+      tv_blob_alloc_ret(lp->ll_tv);
+    }
+
     if (lp->ll_range) {
       if (!quiet) {
         emsg(_("E708: [:] must come last"));
@@ -2229,7 +2237,7 @@ int pattern_match(const char *pat, const char *text, bool ic)
 
   // avoid 'l' flag in 'cpoptions'
   char *save_cpo = p_cpo;
-  p_cpo = empty_option;
+  p_cpo = empty_string_option;
   regmatch.regprog = vim_regcomp(pat, RE_MAGIC + RE_STRING);
   if (regmatch.regprog != NULL) {
     regmatch.rm_ic = ic;
@@ -5641,7 +5649,7 @@ void get_user_input(const typval_T *const argvars, typval_T *const rettv, const 
   rettv->v_type = VAR_STRING;
   rettv->vval.v_string = NULL;
 
-  const char *prompt = "";
+  const char *prompt;
   const char *defstr = "";
   typval_T *cancelreturn = NULL;
   typval_T cancelreturn_strarg2 = TV_INITIAL_VALUE;
@@ -6056,6 +6064,11 @@ bool callback_call(Callback *const callback, const int argcount_in, typval_T *co
                    typval_T *const rettv)
   FUNC_ATTR_NONNULL_ALL
 {
+  if (callback_depth > p_mfd) {
+    emsg(_(e_command_too_recursive));
+    return false;
+  }
+
   partial_T *partial;
   char *name;
   Array args = ARRAY_DICT_INIT;
@@ -6088,9 +6101,6 @@ bool callback_call(Callback *const callback, const int argcount_in, typval_T *co
   case kCallbackNone:
     return false;
     break;
-
-  default:
-    abort();
   }
 
   funcexe_T funcexe = FUNCEXE_INIT;
@@ -6120,7 +6130,7 @@ bool set_ref_in_callback(Callback *callback, int copyID, ht_stack_T **ht_stack,
     return set_ref_in_item(&tv, copyID, ht_stack, list_stack);
     break;
 
-  default:
+  case kCallbackLua:
     abort();
   }
   return false;
@@ -7216,6 +7226,17 @@ void set_vim_var_dict(const VimVarIndex idx, dict_T *const val)
   tv_dict_set_keys_readonly(val);
 }
 
+/// Set v:variable to tv.
+///
+/// @param[in]  idx  Index of variable to set.
+/// @param[in,out]  val  Value to set to. Reference count will be incremented.
+///                      Also keys of the dictionary will be made read-only.
+void set_vim_var_tv(const VimVarIndex idx, typval_T *const tv)
+{
+  tv_clear(&vimvars[idx].vv_di.di_tv);
+  vimvars[idx].vv_di.di_tv = *tv;
+}
+
 /// Set the v:argv list.
 void set_argv_var(char **argv, int argc)
 {
@@ -8101,7 +8122,7 @@ void ex_execute(exarg_T *eap)
       // We don't want to abort following commands, restore did_emsg.
       int save_did_emsg = did_emsg;
       msg_ext_set_kind("echoerr");
-      emsg(ga.ga_data);
+      emsg_multiline(ga.ga_data, true);
       if (!force_abort) {
         did_emsg = save_did_emsg;
       }
@@ -8624,7 +8645,7 @@ char *do_string_sub(char *str, char *pat, char *sub, typval_T *expr, const char 
 
   // Make 'cpoptions' empty, so that the 'l' flag doesn't work here
   char *save_cpo = p_cpo;
-  p_cpo = empty_option;
+  p_cpo = empty_string_option;
 
   ga_init(&ga, 1, 200);
 
@@ -8689,7 +8710,7 @@ char *do_string_sub(char *str, char *pat, char *sub, typval_T *expr, const char 
 
   char *ret = xstrdup(ga.ga_data == NULL ? str : ga.ga_data);
   ga_clear(&ga);
-  if (p_cpo == empty_option) {
+  if (p_cpo == empty_string_option) {
     p_cpo = save_cpo;
   } else {
     // Darn, evaluating {sub} expression or {expr} changed the value.

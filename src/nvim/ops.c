@@ -983,10 +983,12 @@ static int stuff_yank(int regname, char *p)
   yankreg_T *reg = get_yank_register(regname, YREG_YANK);
   if (is_append_register(regname) && reg->y_array != NULL) {
     char **pp = &(reg->y_array[reg->y_size - 1]);
-    char *lp = xmalloc(strlen(*pp) + strlen(p) + 1);
-    STRCPY(lp, *pp);
-    // TODO(philix): use xstpcpy() in stuff_yank()
-    STRCAT(lp, p);
+    const size_t ppl = strlen(*pp);
+    const size_t pl = strlen(p);
+    char *lp = xmalloc(ppl + pl + 1);
+    memcpy(lp, *pp, ppl);
+    memcpy(lp + ppl, p, pl);
+    *(lp + ppl + pl) = NUL;
     xfree(p);
     xfree(*pp);
     *pp = lp;
@@ -5363,8 +5365,8 @@ void cursor_pos_info(dict_T *dict)
         char *const saved_w_sbr = curwin->w_p_sbr;
 
         // Make 'sbr' empty for a moment to get the correct size.
-        p_sbr = empty_option;
-        curwin->w_p_sbr = empty_option;
+        p_sbr = empty_string_option;
+        curwin->w_p_sbr = empty_string_option;
         oparg.is_VIsual = true;
         oparg.motion_type = kMTBlockWise;
         oparg.op_type = OP_NOP;
@@ -6224,6 +6226,9 @@ void do_pending_operator(cmdarg_T *cap, int old_col, bool gui_yank)
         // Restore linebreak, so that when the user edits it looks as before.
         restore_lbr(lbr_saved);
 
+        // trigger TextChangedI
+        curbuf->b_last_changedtick_i = buf_get_changedtick(curbuf);
+
         if (op_change(oap)) {           // will call edit()
           cap->retval |= CA_COMMAND_BUSY;
         }
@@ -6321,6 +6326,9 @@ void do_pending_operator(cmdarg_T *cap, int old_col, bool gui_yank)
 
         // Restore linebreak, so that when the user edits it looks as before.
         restore_lbr(lbr_saved);
+
+        // trigger TextChangedI
+        curbuf->b_last_changedtick_i = buf_get_changedtick(curbuf);
 
         op_insert(oap, cap->count1);
 

@@ -356,6 +356,7 @@ static void insert_enter(InsertState *s)
     ins_apply_autocmds(EVENT_INSERTLEAVE);
   }
   did_cursorhold = false;
+  curbuf->b_last_changedtick = buf_get_changedtick(curbuf);
 }
 
 static int insert_check(VimState *state)

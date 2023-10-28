@@ -3447,20 +3447,20 @@ static frame_T *win_altframe(win_T *win, tabpage_T *tp)
   // By default the next window will get the space that was abandoned by this
   // window
   frame_T *target_fr = frp->fr_next;
-  frame_T *other_fr  = frp->fr_prev;
+  frame_T *other_fr = frp->fr_prev;
 
   // If this is part of a column of windows and 'splitbelow' is true then the
   // previous window will get the space.
   if (frp->fr_parent != NULL && frp->fr_parent->fr_layout == FR_COL && p_sb) {
     target_fr = frp->fr_prev;
-    other_fr  = frp->fr_next;
+    other_fr = frp->fr_next;
   }
 
   // If this is part of a row of windows, and 'splitright' is true then the
   // previous window will get the space.
   if (frp->fr_parent != NULL && frp->fr_parent->fr_layout == FR_ROW && p_spr) {
     target_fr = frp->fr_prev;
-    other_fr  = frp->fr_next;
+    other_fr = frp->fr_next;
   }
 
   // If 'wfh' or 'wfw' is set for the target and not for the alternate
@@ -6952,9 +6952,7 @@ char *file_name_in_line(char *line, int col, int options, int count, char *rel_f
   while (ptr > line) {
     if ((len = (size_t)(utf_head_off(line, ptr - 1))) > 0) {
       ptr -= len + 1;
-    } else if (vim_isfilec((uint8_t)ptr[-1])
-               || (len >= 2 && path_has_drive_letter(ptr - 2))
-               || ((options & FNAME_HYP) && path_is_url(ptr - 1))) {
+    } else if (vim_isfilec((uint8_t)ptr[-1]) || ((options & FNAME_HYP) && path_is_url(ptr - 1))) {
       ptr--;
     } else {
       break;
@@ -7657,4 +7655,30 @@ win_T *lastwin_nofloating(void)
     res = res->w_prev;
   }
   return res;
+}
+
+static int float_zindex_cmp(const void *a, const void *b)
+{
+  return (*(win_T **)b)->w_float_config.zindex - (*(win_T **)a)->w_float_config.zindex;
+}
+
+void win_float_remove(bool bang, int count)
+{
+  kvec_t(win_T *) float_win_arr = KV_INITIAL_VALUE;
+  for (win_T *wp = lastwin; wp && wp->w_floating; wp = wp->w_prev) {
+    kv_push(float_win_arr, wp);
+  }
+  qsort(float_win_arr.items, float_win_arr.size, sizeof(win_T *), float_zindex_cmp);
+  for (size_t i = 0; i < float_win_arr.size; i++) {
+    if (win_close(float_win_arr.items[i], false, false) == FAIL) {
+      break;
+    }
+    if (!bang) {
+      count--;
+      if (count == 0) {
+        break;
+      }
+    }
+  }
+  kv_destroy(float_win_arr);
 }

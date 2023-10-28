@@ -1,4 +1,4 @@
---- @meta
+--- @meta _
 -- THIS FILE IS GENERATED
 -- DO NOT EDIT
 error('Cannot require a meta file')
@@ -998,6 +998,7 @@ vim.bo.cms = vim.bo.commentstring
 --- 	`i_CTRL-X_CTRL-D`
 --- ]	tag completion
 --- t	same as "]"
+--- f	scan the buffer names (as opposed to buffer contents)
 ---
 --- Unloaded buffers are not loaded, thus their autocmds `:autocmd` are
 --- not executed, this may lead to unexpected completions from some files
@@ -2276,7 +2277,7 @@ vim.go.fcl = vim.go.foldclose
 ---     "auto":       resize to the minimum amount of folds to display.
 ---     "auto:[1-9]": resize to accommodate multiple folds up to the
 --- 		  selected level
----     0:            to disable foldcolumn
+---     "0":          to disable foldcolumn
 ---     "[1-9]":      to display a fixed number of columns
 --- See `folding`.
 ---
@@ -3087,8 +3088,9 @@ vim.go.icon = vim.o.icon
 vim.o.iconstring = ""
 vim.go.iconstring = vim.o.iconstring
 
---- Ignore case in search patterns, completion, and when searching the tags file.
---- See also 'smartcase' and 'tagcase'.
+--- Ignore case in search patterns, `cmdline-completion`, when
+--- searching in the tags file, and `expr-==`.
+--- Also see 'smartcase' and 'tagcase'.
 --- Can be overruled by using "\c" or "\C" in the pattern, see
 --- `/ignorecase`.
 ---
@@ -4034,6 +4036,7 @@ vim.go.mat = vim.go.matchtime
 --- Increasing this limit above 200 also changes the maximum for Ex
 --- command recursion, see `E169`.
 --- See also `:function`.
+--- Also used for maximum depth of callback functions.
 ---
 --- @type integer
 vim.o.maxfuncdepth = 100
@@ -4620,6 +4623,12 @@ vim.go.pm = vim.go.patchmode
 --- - Use commas to separate directory names:
 --- ```
 --- 	:set path=.,/usr/local/include,/usr/include
+--- ```
+--- - Spaces can also be used to separate directory names.  To have a
+---   space in a directory name, precede it with an extra backslash, and
+---   escape the space:
+--- ```
+--- 	:set path=.,/dir/with\\\ space
 --- ```
 --- - To include a comma in a directory name precede it with an extra
 ---   backslash:
@@ -6605,7 +6614,7 @@ vim.bo.swf = vim.bo.swapfile
 --- This option controls the behavior when switching between buffers.
 --- This option is checked, when
 --- - jumping to errors with the `quickfix` commands (`:cc`, `:cn`, `:cp`,
----   etc.)
+---   etc.).
 --- - jumping to a tag using the `:stag` command.
 --- - opening a file using the `CTRL-W_f` or `CTRL-W_F` command.
 --- - jumping to a buffer using a buffer split command (e.g.  `:sbuffer`,
@@ -6871,8 +6880,8 @@ vim.go.tagrelative = vim.o.tagrelative
 vim.go.tr = vim.go.tagrelative
 
 --- Filenames for the tag command, separated by spaces or commas.  To
---- include a space or comma in a file name, precede it with a backslash
---- (see `option-backslash` about including spaces and backslashes).
+--- include a space or comma in a file name, precede it with backslashes
+--- (see `option-backslash` about including spaces/commas and backslashes).
 --- When a file name starts with "./", the '.' is replaced with the path
 --- of the current file.  But only when the 'd' flag is not included in
 --- 'cpoptions'.  Environment variables are expanded `:set_env`.  Also see
@@ -7458,6 +7467,8 @@ vim.go.ww = vim.go.whichwrap
 --- The character is not recognized when used inside a macro.  See
 --- 'wildcharm' for that.
 --- Some keys will not work, such as CTRL-C, <CR> and Enter.
+--- <Esc> can be used, but hitting it twice in a row will still exit
+--- command-line as a failsafe measure.
 --- Although 'wc' is a number option, you can set it to a special key:
 --- ```
 --- 	:set wc=<Tab>
@@ -7533,18 +7544,21 @@ vim.go.wic = vim.go.wildignorecase
 --- a completion.
 ---
 --- While the menu is active these keys have special meanings:
----
---- CTRL-Y		- accept the currently selected match and stop
---- 		  completion.
---- CTRL-E		- end completion, go back to what was there before
---- 		  selecting a match.
+--- CTRL-P		- go to the previous entry
+--- CTRL-N		- go to the next entry
 --- <Left> <Right>	- select previous/next match (like CTRL-P/CTRL-N)
+--- <PageUp>	- select a match several entries back
+--- <PageDown>	- select a match several entries further
+--- <Up>		- in filename/menu name completion: move up into
+--- 		  parent directory or parent menu.
 --- <Down>		- in filename/menu name completion: move into a
 --- 		  subdirectory or submenu.
 --- <CR>		- in menu completion, when the cursor is just after a
 --- 		  dot: move into a submenu.
---- <Up>		- in filename/menu name completion: move up into
---- 		  parent directory or parent menu.
+--- CTRL-E		- end completion, go back to what was there before
+--- 		  selecting a match.
+--- CTRL-Y		- accept the currently selected match and stop
+--- 		  completion.
 ---
 --- If you want <Left> and <Right> to move the cursor instead of selecting
 --- a different match, use this:
