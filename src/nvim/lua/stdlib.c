@@ -1,6 +1,3 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check
-// it. PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-
 #include <assert.h>
 #include <lauxlib.h>
 #include <lua.h>
@@ -26,6 +23,7 @@
 #include "nvim/ex_eval.h"
 #include "nvim/fold.h"
 #include "nvim/globals.h"
+#include "nvim/lua/base64.h"
 #include "nvim/lua/converter.h"
 #include "nvim/lua/spell.h"
 #include "nvim/lua/stdlib.h"
@@ -182,8 +180,8 @@ int nlua_str_utfindex(lua_State *const lstate) FUNC_ATTR_NONNULL_ALL
   size_t codepoints = 0, codeunits = 0;
   mb_utflen(s1, (size_t)idx, &codepoints, &codeunits);
 
-  lua_pushinteger(lstate, (long)codepoints);
-  lua_pushinteger(lstate, (long)codeunits);
+  lua_pushinteger(lstate, (lua_Integer)codepoints);
+  lua_pushinteger(lstate, (lua_Integer)codeunits);
 
   return 2;
 }
@@ -203,7 +201,7 @@ static int nlua_str_utf_pos(lua_State *const lstate) FUNC_ATTR_NONNULL_ALL
   size_t clen;
   for (size_t i = 0; i < s1_len && s1[i] != NUL; i += clen) {
     clen = (size_t)utf_ptr2len_len(s1 + i, (int)(s1_len - i));
-    lua_pushinteger(lstate, (long)i + 1);
+    lua_pushinteger(lstate, (lua_Integer)i + 1);
     lua_rawseti(lstate, -2, (int)idx);
     idx++;
   }
@@ -226,7 +224,7 @@ static int nlua_str_utf_start(lua_State *const lstate) FUNC_ATTR_NONNULL_ALL
   if (offset < 0 || offset > (intptr_t)s1_len) {
     return luaL_error(lstate, "index out of range");
   }
-  int head_offset = utf_cp_head_off(s1, s1 + offset - 1);
+  int head_offset = -utf_cp_head_off(s1, s1 + offset - 1);
   lua_pushinteger(lstate, head_offset);
   return 1;
 }
@@ -275,7 +273,7 @@ int nlua_str_byteindex(lua_State *const lstate) FUNC_ATTR_NONNULL_ALL
     return luaL_error(lstate, "index out of range");
   }
 
-  lua_pushinteger(lstate, (long)byteidx);
+  lua_pushinteger(lstate, (lua_Integer)byteidx);
 
   return 1;
 }
@@ -605,6 +603,10 @@ void nlua_state_add_stdlib(lua_State *const lstate, bool is_thread)
     // depends on p_ambw, p_emoji
     lua_pushcfunction(lstate, &nlua_iconv);
     lua_setfield(lstate, -2, "iconv");
+
+    // vim.base64
+    luaopen_base64(lstate);
+    lua_setfield(lstate, -2, "base64");
 
     nlua_state_add_internal(lstate);
   }

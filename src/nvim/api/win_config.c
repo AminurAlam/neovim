@@ -1,8 +1,4 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check
-// it. PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-
 #include <stdbool.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "klib/kvec.h"
@@ -28,6 +24,7 @@
 #include "nvim/syntax.h"
 #include "nvim/ui.h"
 #include "nvim/window.h"
+#include "nvim/winfloat.h"
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "api/win_config.c.generated.h"
@@ -135,7 +132,7 @@
 ///     - "solid": Adds padding by a single whitespace cell.
 ///     - "shadow": A drop shadow effect by blending with the background.
 ///     - If it is an array, it should have a length of eight or any divisor of
-///     eight. The array will specifify the eight chars building up the border
+///     eight. The array will specify the eight chars building up the border
 ///     in a clockwise fashion starting with the top-left corner. As an
 ///     example, the double box style could be specified as
 ///       [ "╔", "═" ,"╗", "║", "╝", "═", "╚", "║" ].

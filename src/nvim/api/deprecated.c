@@ -1,7 +1,3 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check
-// it. PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-
-#include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -172,8 +168,7 @@ Integer nvim_buf_set_virtual_text(Buffer buffer, Integer src_id, Integer line, A
   decor.virt_text_width = width;
   decor.priority = 0;
 
-  extmark_set(buf, ns_id, NULL, (int)line, 0, -1, -1, &decor, true,
-              false, kExtmarkNoUndo, NULL);
+  extmark_set(buf, ns_id, NULL, (int)line, 0, -1, -1, &decor, true, false, false, false, NULL);
   return src_id;
 }
 
@@ -680,21 +675,6 @@ static void set_option_to(uint64_t channel_id, void *to, OptReqScope req_scope, 
   VALIDATE_S(flags != 0, "option name", name.data, {
     return;
   });
-
-  if (value.type == kObjectTypeNil) {
-    if (req_scope == kOptReqGlobal) {
-      api_set_error(err, kErrorTypeException, "Cannot unset option '%s'", name.data);
-      return;
-    } else if (!(flags & SOPT_GLOBAL)) {
-      api_set_error(err, kErrorTypeException,
-                    "Cannot unset option '%s' because it doesn't have a global value",
-                    name.data);
-      return;
-    } else {
-      unset_global_local_option(name.data, to);
-      return;
-    }
-  }
 
   bool error = false;
   OptVal optval = object_as_optval(value, &error);

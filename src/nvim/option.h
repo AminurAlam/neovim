@@ -1,5 +1,4 @@
-#ifndef NVIM_OPTION_H
-#define NVIM_OPTION_H
+#pragma once
 
 #include <stdint.h>
 
@@ -56,6 +55,7 @@ typedef struct vimoption {
   /// cmdline. Only useful for string options.
   opt_expand_cb_T opt_expand_cb;
 
+  // TODO(famiu): Use OptVal for def_val.
   void *def_val;     ///< default values for variable (neovim!!)
   LastSet last_set;  ///< script in which the option was last set
 } vimoption_T;
@@ -72,6 +72,7 @@ enum {
 /// When OPT_GLOBAL and OPT_LOCAL are both missing, set both local and global
 /// values, get local value.
 typedef enum {
+  // TODO(famiu): See if `OPT_FREE` is really necessary and remove it if not.
   OPT_FREE      = 0x01,   ///< Free old value if it was allocated.
   OPT_GLOBAL    = 0x02,   ///< Use global value.
   OPT_LOCAL     = 0x04,   ///< Use local value.
@@ -114,4 +115,3 @@ typedef enum {
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "option.h.generated.h"
 #endif
-#endif  // NVIM_OPTION_H

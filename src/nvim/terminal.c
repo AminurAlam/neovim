@@ -1,6 +1,3 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check
-// it. PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-
 // VT220/xterm-like terminal emulator.
 // Powered by libvterm http://www.leonerd.org.uk/code/libvterm
 //
@@ -236,7 +233,7 @@ void terminal_open(Terminal **termpp, buf_T *buf, TerminalOptions opts)
   aucmd_prepbuf(&aco, buf);
 
   refresh_screen(rv, buf);
-  set_option_value("buftype", STATIC_CSTR_AS_OPTVAL("terminal"), OPT_LOCAL);  // -V666
+  set_option_value("buftype", STATIC_CSTR_AS_OPTVAL("terminal"), OPT_LOCAL);
 
   // Default settings for terminal buffers
   buf->b_p_ma = false;     // 'nomodifiable'
@@ -731,7 +728,7 @@ void terminal_paste(int count, char **y_array, size_t y_size)
   vterm_keyboard_start_paste(curbuf->terminal->vt);
   size_t buff_len = strlen(y_array[0]);
   char *buff = xmalloc(buff_len);
-  for (int i = 0; i < count; i++) {  // -V756
+  for (int i = 0; i < count; i++) {
     // feed the lines to the terminal
     for (size_t j = 0; j < y_size; j++) {
       if (j) {
@@ -1417,13 +1414,14 @@ static void mouse_action(Terminal *term, int button, int row, int col, bool pres
 static bool send_mouse_event(Terminal *term, int c)
 {
   int row = mouse_row, col = mouse_col, grid = mouse_grid;
-  int offset;
   win_T *mouse_win = mouse_find_win(&grid, &row, &col);
-  if (mouse_win == NULL || (offset = win_col_off(mouse_win)) > col) {
+  if (mouse_win == NULL) {
     goto end;
   }
 
-  if (term->forward_mouse && mouse_win->w_buffer->terminal == term) {
+  int offset;
+  if (term->forward_mouse && mouse_win->w_buffer->terminal == term
+      && col >= (offset = win_col_off(mouse_win))) {
     // event in the terminal window and mouse events was enabled by the
     // program. translate and forward the event
     int button;
@@ -1506,13 +1504,14 @@ static bool send_mouse_event(Terminal *term, int c)
     return mouse_win == curwin;
   }
 
-  // ignore left release action if it was not processed above
-  // to prevent leaving Terminal mode after entering to it using a mouse
-  if (c == K_LEFTRELEASE && mouse_win->w_buffer->terminal == term) {
+end:
+  // Ignore left release action if it was not forwarded to prevent
+  // leaving Terminal mode after entering to it using a mouse.
+  if ((c == K_LEFTRELEASE && mouse_win != NULL && mouse_win->w_buffer->terminal == term)
+      || c == K_MOUSEMOVE) {
     return false;
   }
 
-end:
   ins_char_typebuf(vgetc_char, vgetc_mod_mask);
   return true;
 }

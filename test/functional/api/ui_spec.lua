@@ -36,8 +36,6 @@ describe('nvim_ui_attach()', function()
       pcall_err(meths.ui_attach, 80, 24, { term_name=true }))
     eq("Invalid 'term_colors': expected Integer, got Boolean",
       pcall_err(meths.ui_attach, 80, 24, { term_colors=true }))
-    eq("Invalid 'term_background': expected String, got Boolean",
-      pcall_err(meths.ui_attach, 80, 24, { term_background=true }))
     eq("Invalid 'stdin_fd': expected Integer, got String",
       pcall_err(meths.ui_attach, 80, 24, { stdin_fd='foo' }))
     eq("Invalid 'stdin_tty': expected Boolean, got String",
@@ -60,14 +58,13 @@ describe('nvim_ui_attach()', function()
 end)
 
 it('autocmds UIEnter/UILeave', function()
-  clear{
-    args_rm={'--headless'},
-    args={
-      '--cmd', 'let g:evs = []',
-      '--cmd', 'autocmd UIEnter * :call add(g:evs, "UIEnter") | let g:uienter_ev = deepcopy(v:event)',
-      '--cmd', 'autocmd UILeave * :call add(g:evs, "UILeave") | let g:uileave_ev = deepcopy(v:event)',
-      '--cmd', 'autocmd VimEnter * :call add(g:evs, "VimEnter")',
-    }}
+  clear{args_rm={'--headless'}}
+  exec([[
+    let g:evs = []
+    autocmd UIEnter * call add(g:evs, "UIEnter") | let g:uienter_ev = deepcopy(v:event)
+    autocmd UILeave * call add(g:evs, "UILeave") | let g:uileave_ev = deepcopy(v:event)
+    autocmd VimEnter * call add(g:evs, "VimEnter")
+  ]])
   local screen = Screen.new()
   screen:attach()
   eq({chan=1}, eval('g:uienter_ev'))

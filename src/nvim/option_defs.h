@@ -1,5 +1,4 @@
-#ifndef NVIM_OPTION_DEFS_H
-#define NVIM_OPTION_DEFS_H
+#pragma once
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -51,10 +50,6 @@ typedef struct {
   OptValData os_oldval;
   /// New value of the option.
   OptValData os_newval;
-
-  /// When set by the called function: Stop processing the option further.
-  /// Currently only used for boolean options.
-  bool os_doskip;
 
   /// Option value was checked to be safe, no need to set P_INSECURE
   /// Used for the 'keymap', 'filetype' and 'syntax' options.
@@ -119,5 +114,3 @@ typedef struct {
 /// Note: If returned FAIL or *numMatches is 0, *matches will NOT be freed by
 /// caller.
 typedef int (*opt_expand_cb_T)(optexpand_T *args, int *numMatches, char ***matches);
-
-#endif  // NVIM_OPTION_DEFS_H

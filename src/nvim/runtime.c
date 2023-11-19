@@ -1,6 +1,3 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check
-// it. PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-
 /// @file runtime.c
 ///
 /// Management of runtime files (including packages)
@@ -914,7 +911,6 @@ static int gen_expand_wildcards_and_cb(int num_pat, char **pats, int flags, bool
 static int add_pack_dir_to_rtp(char *fname, bool is_pack)
 {
   char *p;
-  char *buf = NULL;
   char *afterdir = NULL;
   int retval = FAIL;
 
@@ -949,7 +945,7 @@ static int add_pack_dir_to_rtp(char *fname, bool is_pack)
   // Find "ffname" in "p_rtp", ignoring '/' vs '\' differences
   // Also stop at the first "after" directory
   size_t fname_len = strlen(ffname);
-  buf = try_malloc(MAXPATHL);
+  char *buf = try_malloc(MAXPATHL);
   if (buf == NULL) {
     goto theend;
   }
@@ -2032,8 +2028,6 @@ int do_source_str(const char *cmd, const char *traceback_name)
 int do_source(char *fname, int check_other, int is_vimrc, int *ret_sid)
 {
   struct source_cookie cookie;
-  char *p;
-  char *fname_exp;
   uint8_t *firstline = NULL;
   int retval = FAIL;
   int save_debug_break_level = debug_break_level;
@@ -2041,11 +2035,11 @@ int do_source(char *fname, int check_other, int is_vimrc, int *ret_sid)
   proftime_T wait_start;
   bool trigger_source_post = false;
 
-  p = expand_env_save(fname);
+  char *p = expand_env_save(fname);
   if (p == NULL) {
     return retval;
   }
-  fname_exp = fix_fname(p);
+  char *fname_exp = fix_fname(p);
   xfree(p);
   if (fname_exp == NULL) {
     return retval;
@@ -2136,7 +2130,7 @@ int do_source(char *fname, int check_other, int is_vimrc, int *ret_sid)
   cookie.finished = false;
 
   // Check if this script has a breakpoint.
-  cookie.breakpoint = dbg_find_breakpoint(true, fname_exp, (linenr_T)0);
+  cookie.breakpoint = dbg_find_breakpoint(true, fname_exp, 0);
   cookie.fname = fname_exp;
   cookie.dbg_tick = debug_tick;
 
@@ -2495,7 +2489,7 @@ void f_getscriptinfo(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
       continue;
     }
 
-    if (filterpat && !vim_regexec(&regmatch, si->sn_name, (colnr_T)0)) {
+    if (filterpat && !vim_regexec(&regmatch, si->sn_name, 0)) {
       continue;
     }
 
@@ -2586,10 +2580,8 @@ char *getsourceline(int c, void *cookie, int indent, bool do_concat)
   }
 
   if (line != NULL && sp->conv.vc_type != CONV_NONE) {
-    char *s;
-
     // Convert the encoding of the script line.
-    s = string_convert(&sp->conv, line, NULL);
+    char *s = string_convert(&sp->conv, line, NULL);
     if (s != NULL) {
       xfree(line);
       line = s;
@@ -2751,8 +2743,6 @@ void ex_finish(exarg_T *eap)
 /// an extra do_cmdline().  "reanimate" is used in the latter case.
 void do_finish(exarg_T *eap, int reanimate)
 {
-  int idx;
-
   if (reanimate) {
     ((struct source_cookie *)getline_cookie(eap->getline,
                                             eap->cookie))->finished = false;
@@ -2762,7 +2752,7 @@ void do_finish(exarg_T *eap, int reanimate)
   // not in its finally clause (which then is to be executed next) is found.
   // In this case, make the ":finish" pending for execution at the ":endtry".
   // Otherwise, finish normally.
-  idx = cleanup_conditionals(eap->cstack, 0, true);
+  int idx = cleanup_conditionals(eap->cstack, 0, true);
   if (idx >= 0) {
     eap->cstack->cs_pending[idx] = CSTP_FINISH;
     report_make_pending(CSTP_FINISH, NULL);

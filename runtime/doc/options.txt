@@ -137,7 +137,7 @@ backslash.  To include a backslash you have to use two.  Effectively this
 means that the number of backslashes in an option value is halved (rounded
 down).
 In options 'path', 'cdpath', and 'tags', spaces have to be preceded with three
-backslashes instead becuase they can be separated by either commas or spaces.
+backslashes instead because they can be separated by either commas or spaces.
 Comma-separated options like 'backupdir' and 'tags' will also require commas
 to be escaped with two backslashes, whereas this is not needed for
 non-comma-separated ones like 'makeprg'.
@@ -1214,6 +1214,8 @@ A jump table for the options with a short description can be found at |Q_op|.
 	current working directory to the |$HOME| directory like in Unix.
 	When off, those commands just print the current directory name.
 	On Unix this option has no effect.
+	This option cannot be set from a |modeline| or in the |sandbox|, for
+	security reasons.
 
 					*'cdpath'* *'cd'* *E344* *E346*
 'cdpath' 'cd'		string	(default equivalent to $CDPATH or ",,")
@@ -2519,10 +2521,8 @@ A jump table for the options with a short description can be found at |Q_op|.
 	default to single-byte alternatives.
 
 	Example: >
-	    :set fillchars=stl:^,stlnc:=,vert:│,fold:·,diff:-
-<	This is similar to the default, except that these characters will also
-	be used when there is highlighting.
-
+	    :set fillchars=stl:\ ,stlnc:\ ,vert:│,fold:·,diff:-
+<
 	For the "stl", "stlnc", "foldopen", "foldclose" and "foldsep" items
 	single-byte and multibyte characters are supported.  But double-width
 	characters are not supported.
@@ -2774,8 +2774,9 @@ A jump table for the options with a short description can be found at |Q_op|.
 'formatoptions' 'fo'	string	(default "tcqj")
 			local to buffer
 	This is a sequence of letters which describes how automatic
-	formatting is to be done.  See |fo-table|.  Commas can be inserted for
-	readability.
+	formatting is to be done.
+	See |fo-table| for possible values and |gq| for how to format text.
+	Commas can be inserted for readability.
 	To avoid problems with flags that are added in the future, use the
 	"+=" and "-=" feature of ":set" |add-option-flags|.
 
@@ -2795,7 +2796,7 @@ A jump table for the options with a short description can be found at |Q_op|.
 	security reasons.
 
 					*'fsync'* *'fs'* *'nofsync'* *'nofs'*
-'fsync' 'fs'		boolean	(default off)
+'fsync' 'fs'		boolean	(default on)
 			global
 	When on, the OS function fsync() will be called after saving a file
 	(|:write|, |writefile()|, …), |swap-file|, |undo-persistence| and |shada-file|.
@@ -4025,7 +4026,6 @@ A jump table for the options with a short description can be found at |Q_op|.
 	Increasing this limit above 200 also changes the maximum for Ex
 	command recursion, see |E169|.
 	See also |:function|.
-	Also used for maximum depth of callback functions.
 
 					*'maxmapdepth'* *'mmd'* *E223*
 'maxmapdepth' 'mmd'	number	(default 1000)
@@ -4095,7 +4095,8 @@ A jump table for the options with a short description can be found at |Q_op|.
 <	If you have less than 512 Mbyte |:mkspell| may fail for some
 	languages, no matter what you set 'mkspellmem' to.
 
-	This option cannot be set from a |modeline| or in the |sandbox|.
+	This option cannot be set from a |modeline| or in the |sandbox|, for
+	security reasons.
 
 				*'modeline'* *'ml'* *'nomodeline'* *'noml'*
 'modeline' 'ml'		boolean	(default on (off for root))
@@ -4475,6 +4476,8 @@ A jump table for the options with a short description can be found at |Q_op|.
 			global
 	Directories used to find packages.
 	See |packages| and |packages-runtimepath|.
+	This option cannot be set from a |modeline| or in the |sandbox|, for
+	security reasons.
 
 						*'paragraphs'* *'para'*
 'paragraphs' 'para'	string	(default "IPLPPPQPP TPHPLIPpLpItpplpipbp")
@@ -4487,6 +4490,8 @@ A jump table for the options with a short description can be found at |Q_op|.
 			global
 	Expression which is evaluated to apply a patch to a file and generate
 	the resulting new version of the file.  See |diff-patchexpr|.
+	This option cannot be set from a |modeline| or in the |sandbox|, for
+	security reasons.
 
 					*'patchmode'* *'pm'* *E205* *E206*
 'patchmode' 'pm'	string	(default "")
@@ -5382,6 +5387,8 @@ A jump table for the options with a short description can be found at |Q_op|.
 	When 'shellxquote' is set to "(" then the characters listed in this
 	option will be escaped with a '^' character.  This makes it possible
 	to execute most external commands with cmd.exe.
+	This option cannot be set from a |modeline| or in the |sandbox|, for
+	security reasons.
 
 						*'shellxquote'* *'sxq'*
 'shellxquote' 'sxq'	string	(default "", Windows: "\"")
@@ -5616,12 +5623,6 @@ A jump table for the options with a short description can be found at |Q_op|.
 	                number (maximum 9), e.g. "yes:3"
 	   "number"	display signs in the 'number' column. If the number
 			column is not present, then behaves like "auto".
-
-	Note regarding "orphaned signs": with signcolumn numbers higher than
-	1, deleting lines will also remove the associated signs automatically,
-	in contrast to the default Vim behavior of keeping and grouping them.
-	This is done in order for the signcolumn appearance not appear weird
-	during line deletion.
 
 			*'smartcase'* *'scs'* *'nosmartcase'* *'noscs'*
 'smartcase' 'scs'	boolean	(default off)
@@ -6429,6 +6430,8 @@ A jump table for the options with a short description can be found at |Q_op|.
 	function and an example.  The value can be the name of a function, a
 	|lambda| or a |Funcref|. See |option-value-function| for more
 	information.
+	This option cannot be set from a |modeline| or in the |sandbox|, for
+	security reasons.
 
 						*'taglength'* *'tl'*
 'taglength' 'tl'	number	(default 0)
@@ -6513,6 +6516,14 @@ A jump table for the options with a short description can be found at |Q_op|.
 		    Carriage return < ' '
 
 	   C1	    Control characters 0x80...0x9F
+
+					*'termsync'* *'notermsync'*
+'termsync'		boolean	(default on)
+			global
+	If the host terminal supports it, buffer all screen updates
+	made during a redraw cycle so that each screen is displayed in
+	the terminal all at once. This can prevent tearing or flickering
+	when the terminal updates faster than Nvim can redraw.
 
 						*'textwidth'* *'tw'*
 'textwidth' 'tw'	number	(default 0)
@@ -6817,6 +6828,8 @@ A jump table for the options with a short description can be found at |Q_op|.
 	Setting 'verbosefile' to a new value is like making it empty first.
 	The difference with |:redir| is that verbose messages are not
 	displayed when 'verbosefile' is set.
+	This option cannot be set from a |modeline| or in the |sandbox|, for
+	security reasons.
 
 						*'viewdir'* *'vdir'*
 'viewdir' 'vdir'	string	(default "$XDG_STATE_HOME/nvim/view//")

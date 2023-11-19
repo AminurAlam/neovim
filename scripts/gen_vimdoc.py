@@ -150,6 +150,7 @@ CONFIG = {
             'diff.lua',
             'mpack.lua',
             'json.lua',
+            'base64.lua',
             'spell.lua',
             'builtin.lua',
             '_options.lua',
@@ -166,6 +167,7 @@ CONFIG = {
             'version.lua',
             'iter.lua',
             'snippet.lua',
+            'text.lua',
         ],
         'files': [
             'runtime/lua/vim/iter.lua',
@@ -183,10 +185,12 @@ CONFIG = {
             'runtime/lua/vim/version.lua',
             'runtime/lua/vim/_inspector.lua',
             'runtime/lua/vim/snippet.lua',
+            'runtime/lua/vim/text.lua',
             'runtime/lua/vim/_meta/builtin.lua',
             'runtime/lua/vim/_meta/diff.lua',
             'runtime/lua/vim/_meta/mpack.lua',
             'runtime/lua/vim/_meta/json.lua',
+            'runtime/lua/vim/_meta/base64.lua',
             'runtime/lua/vim/_meta/regex.lua',
             'runtime/lua/vim/_meta/spell.lua',
         ],
@@ -206,7 +210,7 @@ CONFIG = {
         'section_fmt': lambda name: (
             'Lua module: vim' if name.lower() == '_editor' else
             'LUA-VIMSCRIPT BRIDGE' if name.lower() == '_options' else
-            f'VIM.{name.upper()}' if name.lower() in [ 'highlight', 'mpack', 'json', 'diff', 'spell', 'regex' ] else
+            f'VIM.{name.upper()}' if name.lower() in [ 'highlight', 'mpack', 'json', 'base64', 'diff', 'spell', 'regex' ] else
             'VIM' if name.lower() == 'builtin' else
             f'Lua module: vim.{name.lower()}'),
         'helptag_fmt': lambda name: (
@@ -241,8 +245,11 @@ CONFIG = {
             'builtin': 'vim',
             'mpack': 'vim.mpack',
             'json': 'vim.json',
+            'base64': 'vim.base64',
             'regex': 'vim.regex',
             'spell': 'vim.spell',
+            'snippet': 'vim.snippet',
+            'text': 'vim.text',
         },
         'append_only': [
             'shared.lua',
@@ -256,6 +263,7 @@ CONFIG = {
             'buf.lua',
             'diagnostic.lua',
             'codelens.lua',
+            'inlay_hint.lua',
             'tagfunc.lua',
             'semantic_tokens.lua',
             'handlers.lua',

@@ -1,6 +1,3 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check
-// it. PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-
 // spell.c: code for spell checking
 //
 // See spellfile.c for the Vim spell file format.
@@ -1946,14 +1943,12 @@ char *parse_spelllang(win_T *wp)
   int c;
   char lang[MAXWLEN + 1];
   char spf_name[MAXPATHL];
-  int len;
   char *p;
   int round;
   char *spf;
   char *use_region = NULL;
   bool dont_use_region = false;
   bool nobreak = false;
-  langp_T *lp, *lp2;
   static bool recursive = false;
   char *ret_msg = NULL;
   char *spl_copy;
@@ -1983,7 +1978,7 @@ char *parse_spelllang(win_T *wp)
     // Get one language name.
     copy_option_part(&splp, lang, MAXWLEN, ",");
     region = NULL;
-    len = (int)strlen(lang);
+    int len = (int)strlen(lang);
 
     if (!valid_spelllang(lang)) {
       continue;
@@ -2190,7 +2185,7 @@ char *parse_spelllang(win_T *wp)
   // REP items.  If the language doesn't support it itself use another one
   // with the same name.  E.g. for "en-math" use "en".
   for (int i = 0; i < ga.ga_len; i++) {
-    lp = LANGP_ENTRY(ga, i);
+    langp_T *lp = LANGP_ENTRY(ga, i);
 
     // sound folding
     if (!GA_EMPTY(&lp->lp_slang->sl_sal)) {
@@ -2199,7 +2194,7 @@ char *parse_spelllang(win_T *wp)
     } else {
       // find first similar language that does sound folding
       for (int j = 0; j < ga.ga_len; j++) {
-        lp2 = LANGP_ENTRY(ga, j);
+        langp_T *lp2 = LANGP_ENTRY(ga, j);
         if (!GA_EMPTY(&lp2->lp_slang->sl_sal)
             && strncmp(lp->lp_slang->sl_name,
                        lp2->lp_slang->sl_name, 2) == 0) {
@@ -2216,7 +2211,7 @@ char *parse_spelllang(win_T *wp)
     } else {
       // find first similar language that has REP items
       for (int j = 0; j < ga.ga_len; j++) {
-        lp2 = LANGP_ENTRY(ga, j);
+        langp_T *lp2 = LANGP_ENTRY(ga, j);
         if (!GA_EMPTY(&lp2->lp_slang->sl_rep)
             && strncmp(lp->lp_slang->sl_name,
                        lp2->lp_slang->sl_name, 2) == 0) {
@@ -2257,7 +2252,7 @@ static void use_midword(slang_T *lp, win_T *wp)
       wp->w_s->b_spell_ismw[c] = true;
     } else if (wp->w_s->b_spell_ismw_mb == NULL) {
       // First multi-byte char in "b_spell_ismw_mb".
-      wp->w_s->b_spell_ismw_mb = xstrnsave(p, (size_t)l);
+      wp->w_s->b_spell_ismw_mb = xmemdupz(p, (size_t)l);
     } else {
       // Append multi-byte chars to "b_spell_ismw_mb".
       const int n = (int)strlen(wp->w_s->b_spell_ismw_mb);
@@ -2683,7 +2678,7 @@ void ex_spellrepall(exarg_T *eap)
   sub_nlines = 0;
   curwin->w_cursor.lnum = 0;
   while (!got_int) {
-    if (do_search(NULL, '/', '/', frompat, 1L, SEARCH_KEEP, NULL) == 0
+    if (do_search(NULL, '/', '/', frompat, 1, SEARCH_KEEP, NULL) == 0
         || u_save_cursor() == FAIL) {
       break;
     }
@@ -3322,7 +3317,7 @@ void spell_dump_compl(char *pat, int ic, Direction *dir, int dumpflags_arg)
 
   if (do_region && region_names != NULL && pat == NULL) {
     vim_snprintf(IObuff, IOSIZE, "/regions=%s", region_names);
-    ml_append(lnum++, IObuff, (colnr_T)0, false);
+    ml_append(lnum++, IObuff, 0, false);
   } else {
     do_region = false;
   }
@@ -3337,7 +3332,7 @@ void spell_dump_compl(char *pat, int ic, Direction *dir, int dumpflags_arg)
 
     if (pat == NULL) {
       vim_snprintf(IObuff, IOSIZE, "# file: %s", slang->sl_fname);
-      ml_append(lnum++, IObuff, (colnr_T)0, false);
+      ml_append(lnum++, IObuff, 0, false);
     }
 
     // When matching with a pattern and there are no prefixes only use
@@ -3506,7 +3501,7 @@ static void dump_word(slang_T *slang, char *word, char *pat, Direction *dir, int
       }
     }
 
-    ml_append(lnum, p, (colnr_T)0, false);
+    ml_append(lnum, p, 0, false);
   } else if (((dumpflags & DUMPFLAG_ICASE)
               ? mb_strnicmp(p, pat, strlen(pat)) == 0
               : strncmp(p, pat, strlen(pat)) == 0)

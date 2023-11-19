@@ -1,5 +1,4 @@
-#ifndef NVIM_DECORATION_H
-#define NVIM_DECORATION_H
+#pragma once
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -61,7 +60,9 @@ struct Decoration {
   int col;  // fixed col value, like win_col
   int virt_text_width;  // width of virt_text
   char *sign_text;
+  char *sign_name;
   int sign_hl_id;
+  int sign_add_id;
   int number_hl_id;
   int line_hl_id;
   int cursorline_hl_id;
@@ -72,7 +73,7 @@ struct Decoration {
 };
 #define DECORATION_INIT { KV_INITIAL_VALUE, KV_INITIAL_VALUE, 0, kVTEndOfLine, \
                           kHlModeUnknown, false, false, false, false, kNone, \
-                          DECOR_PRIORITY_BASE, 0, 0, NULL, 0, 0, 0, 0, 0, false }
+                          DECOR_PRIORITY_BASE, 0, 0, NULL, NULL, 0, 0, 0, 0, 0, 0, false }
 
 typedef struct {
   int start_row;
@@ -128,5 +129,3 @@ static inline bool decor_has_sign(Decoration *decor)
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "decoration.h.generated.h"
 #endif
-
-#endif  // NVIM_DECORATION_H

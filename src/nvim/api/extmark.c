@@ -1,6 +1,3 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check
-// it. PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -25,6 +22,7 @@
 #include "nvim/memline.h"
 #include "nvim/memory.h"
 #include "nvim/pos.h"
+#include "nvim/sign.h"
 #include "nvim/strings.h"
 #include "nvim/vim.h"
 
@@ -84,7 +82,7 @@ Dictionary nvim_get_namespaces(void)
   return retval;
 }
 
-const char *describe_ns(NS ns_id)
+const char *describe_ns(NS ns_id, const char *unknown)
 {
   String name;
   handle_T id;
@@ -93,7 +91,7 @@ const char *describe_ns(NS ns_id)
       return name.data;
     }
   })
-  return "(UNKNOWN PLUGIN)";
+  return unknown;
 }
 
 // Is the Namespace in use?
@@ -144,29 +142,42 @@ Array virt_text_to_array(VirtText vt, bool hl_name)
   return chunks;
 }
 
-static Array extmark_to_array(const ExtmarkInfo *extmark, bool id, bool add_dict, bool hl_name)
+static Array extmark_to_array(MTPair extmark, bool id, bool add_dict, bool hl_name)
 {
+  MTKey start = extmark.start;
   Array rv = ARRAY_DICT_INIT;
   if (id) {
-    ADD(rv, INTEGER_OBJ((Integer)extmark->mark_id));
+    ADD(rv, INTEGER_OBJ((Integer)start.id));
   }
-  ADD(rv, INTEGER_OBJ(extmark->row));
-  ADD(rv, INTEGER_OBJ(extmark->col));
+  ADD(rv, INTEGER_OBJ(start.pos.row));
+  ADD(rv, INTEGER_OBJ(start.pos.col));
 
   if (add_dict) {
     Dictionary dict = ARRAY_DICT_INIT;
 
-    PUT(dict, "ns_id", INTEGER_OBJ((Integer)extmark->ns_id));
+    PUT(dict, "ns_id", INTEGER_OBJ((Integer)start.ns));
 
-    PUT(dict, "right_gravity", BOOLEAN_OBJ(extmark->right_gravity));
+    PUT(dict, "right_gravity", BOOLEAN_OBJ(mt_right(start)));
 
-    if (extmark->end_row >= 0) {
-      PUT(dict, "end_row", INTEGER_OBJ(extmark->end_row));
-      PUT(dict, "end_col", INTEGER_OBJ(extmark->end_col));
-      PUT(dict, "end_right_gravity", BOOLEAN_OBJ(extmark->end_right_gravity));
+    if (extmark.end_pos.row >= 0) {
+      PUT(dict, "end_row", INTEGER_OBJ(extmark.end_pos.row));
+      PUT(dict, "end_col", INTEGER_OBJ(extmark.end_pos.col));
+      PUT(dict, "end_right_gravity", BOOLEAN_OBJ(extmark.end_right_gravity));
     }
 
-    const Decoration *decor = &extmark->decor;
+    if (mt_no_undo(start)) {
+      PUT(dict, "undo_restore", BOOLEAN_OBJ(false));
+    }
+
+    if (mt_invalidate(start)) {
+      PUT(dict, "invalidate", BOOLEAN_OBJ(true));
+    }
+    if (mt_invalid(start)) {
+      PUT(dict, "invalid", BOOLEAN_OBJ(true));
+    }
+
+    // pretend this is a pointer for a short while, Decoration will be factored away very soon
+    const Decoration decor[1] = { get_decor(start) };
     if (decor->hl_id) {
       PUT(dict, "hl_group", hl_group_name(decor->hl_id, hl_name));
       PUT(dict, "hl_eol", BOOLEAN_OBJ(decor->hl_eol));
@@ -299,15 +310,15 @@ ArrayOf(Integer) nvim_buf_get_extmark_by_id(Buffer buffer, Integer ns_id,
     }
   }
 
-  ExtmarkInfo extmark = extmark_from_id(buf, (uint32_t)ns_id, (uint32_t)id);
-  if (extmark.row < 0) {
+  MTPair extmark = extmark_from_id(buf, (uint32_t)ns_id, (uint32_t)id);
+  if (extmark.start.pos.row < 0) {
     return rv;
   }
-  return extmark_to_array(&extmark, false, details, hl_name);
+  return extmark_to_array(extmark, false, details, hl_name);
 }
 
-/// Gets |extmarks| in "traversal order" from a |charwise| region defined by
-/// buffer positions (inclusive, 0-indexed |api-indexing|).
+/// Gets |extmarks| (including |signs|) in "traversal order" from a |charwise|
+/// region defined by buffer positions (inclusive, 0-indexed |api-indexing|).
 ///
 /// Region can be given as (row,col) tuples, or valid extmark ids (whose
 /// positions define the bounds). 0 and -1 are understood as (0,0) and (-1,-1)
@@ -423,7 +434,7 @@ Array nvim_buf_get_extmarks(Buffer buffer, Integer ns_id, Object start, Object e
                                        u_col, (int64_t)limit, reverse, type, opts->overlap);
 
   for (size_t i = 0; i < kv_size(marks); i++) {
-    ADD(rv, ARRAY_OBJ(extmark_to_array(&kv_A(marks, i), true, details, hl_name)));
+    ADD(rv, ARRAY_OBJ(extmark_to_array(kv_A(marks, i), true, details, hl_name)));
   }
 
   kv_destroy(marks);
@@ -519,6 +530,12 @@ Array nvim_buf_get_extmarks(Buffer buffer, Integer ns_id, Object start, Object e
 ///                   the extmark end position (if it exists) will be shifted
 ///                   in when new text is inserted (true for right, false
 ///                   for left). Defaults to false.
+///               - undo_restore : Restore the exact position of the mark
+///                   if text around the mark was deleted and then restored by undo.
+///                   Defaults to true.
+///               - invalidate : boolean that indicates whether to hide the
+///                   extmark if the entirety of its range is deleted. If
+///                   "undo_restore" is false, the extmark is deleted instead.
 ///               - priority: a priority value for the highlight group or sign
 ///                   attribute. For example treesitter highlighting uses a
 ///                   value of 100.
@@ -736,7 +753,7 @@ Integer nvim_buf_set_extmark(Buffer buffer, Integer ns_id, Integer line, Integer
   }
 
   if (HAS_KEY(opts, set_extmark, sign_text)) {
-    VALIDATE_S(init_sign_text(&decor.sign_text, opts->sign_text.data),
+    VALIDATE_S(init_sign_text(NULL, &decor.sign_text, opts->sign_text.data),
                "sign_text", "", {
       goto error;
     });
@@ -751,8 +768,6 @@ Integer nvim_buf_set_extmark(Buffer buffer, Integer ns_id, Integer line, Integer
            "%s", "cannot set end_right_gravity without end_row or end_col", {
     goto error;
   });
-
-  bool end_right_gravity = opts->end_right_gravity;
 
   size_t len = 0;
 
@@ -816,7 +831,7 @@ Integer nvim_buf_set_extmark(Buffer buffer, Integer ns_id, Integer line, Integer
 
   // TODO(bfredl): synergize these two branches even more
   if (opts->ephemeral && decor_state.win && decor_state.win->w_buffer == buf) {
-    decor_add_ephemeral((int)line, (int)col, line2, col2, &decor, (uint64_t)ns_id, id);
+    decor_push_ephemeral((int)line, (int)col, line2, col2, &decor, (uint64_t)ns_id, id);
   } else {
     if (opts->ephemeral) {
       api_set_error(err, kErrorTypeException, "not yet implemented");
@@ -824,8 +839,9 @@ Integer nvim_buf_set_extmark(Buffer buffer, Integer ns_id, Integer line, Integer
     }
 
     extmark_set(buf, (uint32_t)ns_id, &id, (int)line, (colnr_T)col, line2, col2,
-                has_decor ? &decor : NULL, right_gravity, end_right_gravity,
-                kExtmarkNoUndo, err);
+                has_decor ? &decor : NULL, right_gravity, opts->end_right_gravity,
+                !GET_BOOL_OR_TRUE(opts, set_extmark, undo_restore),
+                opts->invalidate, err);
     if (ERROR_SET(err)) {
       goto error;
     }
@@ -862,7 +878,7 @@ Boolean nvim_buf_del_extmark(Buffer buffer, Integer ns_id, Integer id, Error *er
     return false;
   }
 
-  return extmark_del(buf, (uint32_t)ns_id, (uint32_t)id);
+  return extmark_del_id(buf, (uint32_t)ns_id, (uint32_t)id);
 }
 
 uint32_t src2ns(Integer *src_id)
@@ -952,7 +968,7 @@ Integer nvim_buf_add_highlight(Buffer buffer, Integer ns_id, String hl_group, In
   extmark_set(buf, ns, NULL,
               (int)line, (colnr_T)col_start,
               end_line, (colnr_T)col_end,
-              &decor, true, false, kExtmarkNoUndo, NULL);
+              &decor, true, false, false, false, NULL);
   return ns_id;
 }
 
@@ -1003,7 +1019,7 @@ void nvim_buf_clear_namespace(Buffer buffer, Integer ns_id, Integer line_start, 
 /// redrawn buffer. |nvim_buf_set_extmark()| can be called to add marks
 /// on a per-window or per-lines basis. Use the `ephemeral` key to only
 /// use the mark for the current screen redraw (the callback will be called
-/// again for the next redraw ).
+/// again for the next redraw).
 ///
 /// Note: this function should not be called often. Rather, the callbacks
 /// themselves can be used to throttle unneeded callbacks. the `on_start`
@@ -1107,13 +1123,13 @@ static bool extmark_get_index_from_obj(buf_T *buf, Integer ns_id, Object obj, in
       });
     }
 
-    ExtmarkInfo extmark = extmark_from_id(buf, (uint32_t)ns_id, (uint32_t)id);
+    MTPair extmark = extmark_from_id(buf, (uint32_t)ns_id, (uint32_t)id);
 
-    VALIDATE_INT((extmark.row >= 0), "mark id (not found)", id, {
+    VALIDATE_INT((extmark.start.pos.row >= 0), "mark id (not found)", id, {
       return false;
     });
-    *row = extmark.row;
-    *col = extmark.col;
+    *row = extmark.start.pos.row;
+    *col = extmark.start.pos.col;
     return true;
 
     // Check if it is a position
@@ -1136,41 +1152,6 @@ static bool extmark_get_index_from_obj(buf_T *buf, Integer ns_id, Object obj, in
       return false;
     });
   }
-}
-// adapted from sign.c:sign_define_init_text.
-// TODO(lewis6991): Consider merging
-static int init_sign_text(char **sign_text, char *text)
-{
-  char *s;
-
-  char *endp = text + (int)strlen(text);
-
-  // Count cells and check for non-printable chars
-  int cells = 0;
-  for (s = text; s < endp; s += utfc_ptr2len(s)) {
-    if (!vim_isprintc(utf_ptr2char(s))) {
-      break;
-    }
-    cells += utf_ptr2cells(s);
-  }
-  // Currently must be empty, one or two display cells
-  if (s != endp || cells > 2) {
-    return FAIL;
-  }
-  if (cells < 1) {
-    return OK;
-  }
-
-  // Allocate one byte more if we need to pad up
-  // with a space.
-  size_t len = (size_t)(endp - text + ((cells == 1) ? 1 : 0));
-  *sign_text = xstrnsave(text, len);
-
-  if (cells == 1) {
-    STRCPY(*sign_text + len - 1, " ");
-  }
-
-  return OK;
 }
 
 VirtText parse_virt_text(Array chunks, Error *err, int *width)

@@ -1,6 +1,3 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check
-// it. PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-
 #include <assert.h>
 #include <string.h>
 
@@ -28,7 +25,7 @@ static kvec_t(DecorProvider) decor_providers = KV_INITIAL_VALUE;
 
 static void decor_provider_error(DecorProvider *provider, const char *name, const char *msg)
 {
-  const char *ns_name = describe_ns(provider->ns_id);
+  const char *ns_name = describe_ns(provider->ns_id, "(UNKNOWN PLUGIN)");
   ELOG("error in provider %s.%s: %s", ns_name, name, msg);
   msg_schedule_semsg_multiline("Error in decoration provider %s.%s:\n%s", ns_name, name, msg);
 }

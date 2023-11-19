@@ -7,7 +7,8 @@ if(TARGET libuv::uv_a)
   target_link_libraries(libuv INTERFACE libuv::uv_a)
   mark_as_advanced(libuv_DIR)
 else()
-  # Fall back to find module for older libuv versions that don't provide config file
+  # Fall back to find module for libuv versions older than v1.45.0 which don't
+  # provide a config file
   find_package(Libuv 1.28.0 REQUIRED MODULE)
   target_include_directories(libuv SYSTEM BEFORE INTERFACE ${LIBUV_INCLUDE_DIR})
   target_link_libraries(libuv INTERFACE ${LIBUV_LIBRARIES})
@@ -100,7 +101,8 @@ else()
     -Wdouble-promotion
     -Wmissing-noreturn
     -Wmissing-format-attribute
-    -Wmissing-prototypes)
+    -Wmissing-prototypes
+    -fsigned-char)
 
   if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
     target_compile_options(main_lib INTERFACE -fno-common
@@ -170,11 +172,6 @@ if(CI_BUILD)
   else()
     target_compile_options(main_lib INTERFACE -Werror)
   endif()
-endif()
-
-option(UNSIGNED_CHAR "Set char to be unsigned" OFF)
-if(UNSIGNED_CHAR)
-  target_compile_options(main_lib INTERFACE -funsigned-char)
 endif()
 
 target_compile_definitions(main_lib INTERFACE INCLUDE_GENERATED_DECLARATIONS)
@@ -293,6 +290,7 @@ set(LUA_LOADER_MODULE_SOURCE ${NVIM_RUNTIME_DIR}/lua/vim/loader.lua)
 set(LUA_INSPECT_MODULE_SOURCE ${NVIM_RUNTIME_DIR}/lua/vim/inspect.lua)
 set(LUA_FS_MODULE_SOURCE ${NVIM_RUNTIME_DIR}/lua/vim/fs.lua)
 set(LUA_F_MODULE_SOURCE ${NVIM_RUNTIME_DIR}/lua/vim/F.lua)
+set(LUA_DEFAULTS_MODULE_SOURCE ${NVIM_RUNTIME_DIR}/lua/vim/_defaults.lua)
 set(LUA_OPTIONS_MODULE_SOURCE ${NVIM_RUNTIME_DIR}/lua/vim/_options.lua)
 set(LUA_FILETYPE_MODULE_SOURCE ${NVIM_RUNTIME_DIR}/lua/vim/filetype.lua)
 set(LUA_INIT_PACKAGES_MODULE_SOURCE ${NVIM_RUNTIME_DIR}/lua/vim/_init_packages.lua)
@@ -365,12 +363,6 @@ list(APPEND LINT_NVIM_SOURCES ${NVIM_SOURCES} ${NVIM_HEADERS})
 
 foreach(sfile ${NVIM_SOURCES})
   get_filename_component(f ${sfile} NAME)
-  if(${f} MATCHES "^(regexp_nfa.c)$")
-    list(APPEND to_remove ${sfile})
-  endif()
-  if(${f} MATCHES "^(regexp_bt.c)$")
-    list(APPEND to_remove ${sfile})
-  endif()
   if(WIN32 AND ${f} MATCHES "^(pty_process_unix.c)$")
     list(APPEND to_remove ${sfile})
   endif()
@@ -428,7 +420,10 @@ if(APPLE AND CMAKE_OSX_SYSROOT)
   list(APPEND gen_cflags "-isysroot")
   list(APPEND gen_cflags "${CMAKE_OSX_SYSROOT}")
 endif()
-set(gen_cflags ${gen_cflags} -O2)
+if(MSVC)
+  list(APPEND gen_cflags -wd4003)
+endif()
+list(APPEND gen_cflags -O2)
 
 set(NVIM_VERSION_GIT_H ${PROJECT_BINARY_DIR}/cmake.config/auto/versiondef_git.h)
 add_custom_target(update_version_stamp
@@ -459,8 +454,6 @@ set(LUA_GEN_DEPS ${GENERATOR_PRELOAD} $<TARGET_FILE:nlua0>)
 # NVIM_GENERATED_SOURCES: generated source files
 # These lists must be mutually exclusive.
 foreach(sfile ${NVIM_SOURCES}
-              "${CMAKE_CURRENT_LIST_DIR}/regexp_bt.c"
-              "${CMAKE_CURRENT_LIST_DIR}/regexp_nfa.c"
               ${GENERATED_API_DISPATCH}
               "${GENERATED_UI_EVENTS_CALL}"
               "${GENERATED_UI_EVENTS_REMOTE}"
@@ -546,6 +539,7 @@ add_custom_command(
       ${LUA_F_MODULE_SOURCE} "vim.F"
       ${LUA_KEYMAP_MODULE_SOURCE} "vim.keymap"
       ${LUA_LOADER_MODULE_SOURCE} "vim.loader"
+      ${LUA_DEFAULTS_MODULE_SOURCE} "vim._defaults"
       ${LUA_OPTIONS_MODULE_SOURCE} "vim._options"
       ${LUA_SHARED_MODULE_SOURCE} "vim.shared"
   DEPENDS
@@ -558,6 +552,7 @@ add_custom_command(
     ${LUA_F_MODULE_SOURCE}
     ${LUA_KEYMAP_MODULE_SOURCE}
     ${LUA_LOADER_MODULE_SOURCE}
+    ${LUA_DEFAULTS_MODULE_SOURCE}
     ${LUA_OPTIONS_MODULE_SOURCE}
     ${LUA_SHARED_MODULE_SOURCE}
   VERBATIM
@@ -775,17 +770,20 @@ target_link_libraries(libnvim PRIVATE main_lib PUBLIC libuv)
 
 if(ENABLE_ASAN_UBSAN)
   message(STATUS "Enabling address sanitizer and undefined behavior sanitizer for nvim.")
-  if(CI_BUILD)
-    # Try to recover from all sanitize issues so we get reports about all failures
-    target_compile_options(nvim PRIVATE -fsanitize-recover=all)
-  else()
-    target_compile_options(nvim PRIVATE -fno-sanitize-recover=all)
+  if(NOT MSVC)
+    if(CI_BUILD)
+      # Try to recover from all sanitize issues so we get reports about all failures
+      target_compile_options(nvim PRIVATE -fsanitize-recover=all)
+    else()
+      target_compile_options(nvim PRIVATE -fno-sanitize-recover=all)
+    endif()
+    target_compile_options(nvim PRIVATE
+      -fno-omit-frame-pointer
+      -fno-optimize-sibling-calls
+      -fsanitize=undefined)
   endif()
-  target_compile_options(nvim PRIVATE
-    -fno-omit-frame-pointer
-    -fno-optimize-sibling-calls
-    -fsanitize=address
-    -fsanitize=undefined)
+
+  target_compile_options(nvim PRIVATE -fsanitize=address)
   target_link_libraries(nvim PRIVATE -fsanitize=address -fsanitize=undefined)
   target_compile_definitions(nvim PRIVATE ENABLE_ASAN_UBSAN)
 elseif(ENABLE_MSAN)
@@ -816,7 +814,7 @@ else()
     os/os_win_console.h)
 endif()
 add_glob_target(
-  TARGET clang-tidy
+  TARGET lintc-clang-tidy
   COMMAND ${CLANG_TIDY_PRG}
   FILES ${NVIM_SOURCES} ${NVIM_HEADERS}
   FLAGS --quiet
@@ -845,7 +843,7 @@ add_glob_target(
 add_custom_target(copy_compile_commands
   COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/compile_commands.json ${PROJECT_SOURCE_DIR}/compile_commands.json)
 add_dependencies(copy_compile_commands nvim)
-add_dependencies(clang-tidy copy_compile_commands)
+add_dependencies(lintc-clang-tidy copy_compile_commands)
 add_dependencies(clang-analyzer copy_compile_commands)
 
 if(CI_BUILD)
@@ -862,15 +860,16 @@ add_glob_target(
     tui/terminfo_defs.h)
 
 set(UNCRUSTIFY_PRG ${DEPS_BIN_DIR}/uncrustify)
+set(UNCRUSTIFY_CONFIG ${PROJECT_SOURCE_DIR}/src/uncrustify.cfg)
+
+add_custom_target(uncrustify_update_config
+  ${UNCRUSTIFY_PRG} -c ${UNCRUSTIFY_CONFIG} --update-config-with-doc -o ${UNCRUSTIFY_CONFIG})
+
 add_glob_target(
   TARGET lintc-uncrustify
   COMMAND ${UNCRUSTIFY_PRG}
-  FLAGS -c "${PROJECT_SOURCE_DIR}/src/uncrustify.cfg" -q --check
+  FLAGS -c ${UNCRUSTIFY_CONFIG} -q --check
   FILES ${LINT_NVIM_SOURCES})
-add_dependencies(lintc-uncrustify uncrustify)
-
-add_custom_target(lintc)
-add_dependencies(lintc lintc-clint lintc-uncrustify)
 
 add_custom_target(formatc
   COMMAND ${CMAKE_COMMAND}
@@ -878,7 +877,13 @@ add_custom_target(formatc
     -D LANG=c
     -P ${PROJECT_SOURCE_DIR}/cmake/Format.cmake
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
-add_dependencies(formatc uncrustify)
+
+add_dependencies(lintc-uncrustify uncrustify_update_config)
+add_dependencies(formatc uncrustify_update_config)
+add_dependencies(uncrustify_update_config uncrustify)
+
+add_custom_target(lintc)
+add_dependencies(lintc lintc-clint lintc-uncrustify lintc-clang-tidy)
 
 add_custom_target(generated-sources DEPENDS
   ${NVIM_GENERATED_FOR_SOURCES}
@@ -917,7 +922,10 @@ glob_wrapper(LUA_SOURCES
 add_custom_command(
   OUTPUT ${VIMDOC_FILES}
   COMMAND ${PROJECT_SOURCE_DIR}/scripts/gen_vimdoc.py
-  DEPENDS ${API_SOURCES} ${LUA_SOURCES}
+  DEPENDS
+    nvim
+    ${API_SOURCES}
+    ${LUA_SOURCES}
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 
@@ -932,7 +940,7 @@ set(GEN_EVAL_FILES
 
 add_custom_command(
   OUTPUT ${GEN_EVAL_FILES}
-  COMMAND ${PROJECT_SOURCE_DIR}/scripts/gen_eval_files.lua
+  COMMAND $<TARGET_FILE:nvim> -l ${PROJECT_SOURCE_DIR}/scripts/gen_eval_files.lua
   DEPENDS
     ${API_METADATA}
     ${PROJECT_SOURCE_DIR}/scripts/gen_eval_files.lua

@@ -942,6 +942,8 @@ return {
         current working directory to the |$HOME| directory like in Unix.
         When off, those commands just print the current directory name.
         On Unix this option has no effect.
+        This option cannot be set from a |modeline| or in the |sandbox|, for
+        security reasons.
       ]=],
       full_name = 'cdhome',
       scope = { 'global' },
@@ -2849,10 +2851,8 @@ return {
         default to single-byte alternatives.
 
         Example: >
-            :set fillchars=stl:^,stlnc:=,vert:│,fold:·,diff:-
-        <	This is similar to the default, except that these characters will also
-        be used when there is highlighting.
-
+            :set fillchars=stl:\ ,stlnc:\ ,vert:│,fold:·,diff:-
+        <
         For the "stl", "stlnc", "foldopen", "foldclose" and "foldsep" items
         single-byte and multibyte characters are supported.  But double-width
         characters are not supported.
@@ -3246,8 +3246,9 @@ return {
       defaults = { if_true = macros('DFLT_FO_VIM') },
       desc = [=[
         This is a sequence of letters which describes how automatic
-        formatting is to be done.  See |fo-table|.  Commas can be inserted for
-        readability.
+        formatting is to be done.
+        See |fo-table| for possible values and |gq| for how to format text.
+        Commas can be inserted for readability.
         To avoid problems with flags that are added in the future, use the
         "+=" and "-=" feature of ":set" |add-option-flags|.
       ]=],
@@ -3306,7 +3307,7 @@ return {
     },
     {
       abbreviation = 'fs',
-      defaults = { if_true = false },
+      defaults = { if_true = true },
       desc = [=[
         When on, the OS function fsync() will be called after saving a file
         (|:write|, |writefile()|, …), |swap-file|, |undo-persistence| and |shada-file|.
@@ -5154,7 +5155,6 @@ return {
         Increasing this limit above 200 also changes the maximum for Ex
         command recursion, see |E169|.
         See also |:function|.
-        Also used for maximum depth of callback functions.
       ]=],
       full_name = 'maxfuncdepth',
       scope = { 'global' },
@@ -5254,7 +5254,8 @@ return {
         <	If you have less than 512 Mbyte |:mkspell| may fail for some
         languages, no matter what you set 'mkspellmem' to.
 
-        This option cannot be set from a |modeline| or in the |sandbox|.
+        This option cannot be set from a |modeline| or in the |sandbox|, for
+        security reasons.
       ]=],
       expand = true,
       full_name = 'mkspellmem',
@@ -5830,6 +5831,8 @@ return {
       desc = [=[
         Directories used to find packages.
         See |packages| and |packages-runtimepath|.
+        This option cannot be set from a |modeline| or in the |sandbox|, for
+        security reasons.
       ]=],
       expand = true,
       full_name = 'packpath',
@@ -5878,6 +5881,8 @@ return {
       desc = [=[
         Expression which is evaluated to apply a patch to a file and generate
         the resulting new version of the file.  See |diff-patchexpr|.
+        This option cannot be set from a |modeline| or in the |sandbox|, for
+        security reasons.
       ]=],
       full_name = 'patchexpr',
       scope = { 'global' },
@@ -7256,6 +7261,8 @@ return {
         When 'shellxquote' is set to "(" then the characters listed in this
         option will be escaped with a '^' character.  This makes it possible
         to execute most external commands with cmd.exe.
+        This option cannot be set from a |modeline| or in the |sandbox|, for
+        security reasons.
       ]=],
       full_name = 'shellxescape',
       scope = { 'global' },
@@ -7583,12 +7590,6 @@ return {
                         number (maximum 9), e.g. "yes:3"
            "number"	display signs in the 'number' column. If the number
         		column is not present, then behaves like "auto".
-
-        Note regarding "orphaned signs": with signcolumn numbers higher than
-        1, deleting lines will also remove the associated signs automatically,
-        in contrast to the default Vim behavior of keeping and grouping them.
-        This is done in order for the signcolumn appearance not appear weird
-        during line deletion.
       ]=],
       expand_cb = 'expand_set_signcolumn',
       full_name = 'signcolumn',
@@ -8464,6 +8465,8 @@ return {
         function and an example.  The value can be the name of a function, a
         |lambda| or a |Funcref|. See |option-value-function| for more
         information.
+        This option cannot be set from a |modeline| or in the |sandbox|, for
+        security reasons.
       ]=],
       full_name = 'tagfunc',
       func = true,
@@ -8799,6 +8802,21 @@ return {
       scope = { 'global' },
       type = 'string',
       varname = 'p_tpf',
+    },
+    {
+      defaults = { if_true = true },
+      desc = [=[
+        If the host terminal supports it, buffer all screen updates
+        made during a redraw cycle so that each screen is displayed in
+        the terminal all at once. This can prevent tearing or flickering
+        when the terminal updates faster than Nvim can redraw.
+      ]=],
+      full_name = 'termsync',
+      redraw = { 'ui_option' },
+      scope = { 'global' },
+      short_desc = N_('synchronize redraw output with the host terminal'),
+      type = 'bool',
+      varname = 'p_termsync',
     },
     {
       defaults = { if_true = false },
@@ -9297,6 +9315,8 @@ return {
         Setting 'verbosefile' to a new value is like making it empty first.
         The difference with |:redir| is that verbose messages are not
         displayed when 'verbosefile' is set.
+        This option cannot be set from a |modeline| or in the |sandbox|, for
+        security reasons.
       ]=],
       expand = true,
       full_name = 'verbosefile',

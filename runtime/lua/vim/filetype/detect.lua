@@ -1655,6 +1655,7 @@ local patterns_hashbang = {
   ['^crystal\\>'] = { 'crystal', { vim_regex = true } },
   ['^\\%(rexx\\|regina\\)\\>'] = { 'rexx', { vim_regex = true } },
   ['^janet\\>'] = { 'janet', { vim_regex = true } },
+  ['^dart\\>'] = { 'dart', { vim_regex = true } },
 }
 
 ---@private
@@ -1797,7 +1798,7 @@ local patterns_text = {
   function(lines)
     if
       -- inaccurate fast match first, then use accurate slow match
-      (lines[1]:find('execve%(') and lines[1]:find('^[0-9:%.]* *execve%('))
+      (lines[1]:find('execve%(') and lines[1]:find('^[0-9:%. ]*execve%('))
       or lines[1]:find('^__libc_start_main')
     then
       return 'strace'

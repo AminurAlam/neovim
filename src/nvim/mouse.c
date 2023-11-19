@@ -1,6 +1,3 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check
-// it. PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -103,15 +100,12 @@ static void find_start_of_word(pos_T *pos)
 /// When 'selection' is "exclusive", the position is just after the word.
 static void find_end_of_word(pos_T *pos)
 {
-  char *line;
-  int cclass;
-
-  line = ml_get(pos->lnum);
+  char *line = ml_get(pos->lnum);
   if (*p_sel == 'e' && pos->col > 0) {
     pos->col--;
     pos->col -= utf_head_off(line, line + pos->col);
   }
-  cclass = get_mouse_class(line + pos->col);
+  int cclass = get_mouse_class(line + pos->col);
   while (line[pos->col] != NUL) {
     int col = pos->col + utfc_ptr2len(line + pos->col);
     if (get_mouse_class(line + col) != cclass) {
@@ -452,7 +446,7 @@ bool do_mouse(oparg_T *oap, int c, int dir, int count, bool fixindent)
         if ((State & REPLACE_FLAG) && !yank_register_mline(regname)) {
           insert_reg(regname, true);
         } else {
-          do_put(regname, NULL, BACKWARD, 1L,
+          do_put(regname, NULL, BACKWARD, 1,
                  (fixindent ? PUT_FIXINDENT : 0) | PUT_CURSEND);
 
           // Repeat it with CTRL-R CTRL-O r or CTRL-R CTRL-P r
@@ -710,9 +704,9 @@ popupexit:
       && which_button == MOUSE_LEFT) {
     // open or close a fold at this line
     if (jump_flags & MOUSE_FOLD_OPEN) {
-      openFold(curwin->w_cursor, 1L);
+      openFold(curwin->w_cursor, 1);
     } else {
-      closeFold(curwin->w_cursor, 1L);
+      closeFold(curwin->w_cursor, 1);
     }
     // don't move the cursor if still in the same window
     if (curwin == old_curwin) {
@@ -733,7 +727,7 @@ popupexit:
 
   // When dragging the mouse above the window, scroll down.
   if (is_drag && mouse_row < 0 && !in_status_line) {
-    scroll_redraw(false, 1L);
+    scroll_redraw(false, 1);
     mouse_row = 0;
   }
 
@@ -967,11 +961,10 @@ popupexit:
 
 void ins_mouse(int c)
 {
-  pos_T tpos;
   win_T *old_curwin = curwin;
 
   undisplay_dollar();
-  tpos = curwin->w_cursor;
+  pos_T tpos = curwin->w_cursor;
   if (do_mouse(NULL, c, BACKWARD, 1, 0)) {
     win_T *new_curwin = curwin;
 
@@ -1186,8 +1179,6 @@ int jump_to_mouse(int flags, bool *inclusive, int which_button)
   static int prev_col = -1;
   static int did_drag = false;          // drag was noticed
 
-  win_T *wp, *old_curwin;
-  pos_T old_cursor;
   int count;
   bool first;
   int row = mouse_row;
@@ -1240,15 +1231,15 @@ retnomove:
   if (flags & MOUSE_SETPOS) {
     goto retnomove;                             // ugly goto...
   }
-  old_curwin = curwin;
-  old_cursor = curwin->w_cursor;
+  win_T *old_curwin = curwin;
+  pos_T old_cursor = curwin->w_cursor;
 
   if (row < 0 || col < 0) {                   // check if it makes sense
     return IN_UNKNOWN;
   }
 
   // find the window where the row is in
-  wp = mouse_find_win(&grid, &row, &col);
+  win_T *wp = mouse_find_win(&grid, &row, &col);
   if (wp == NULL) {
     return IN_UNKNOWN;
   }

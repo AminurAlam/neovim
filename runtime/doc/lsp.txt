@@ -856,13 +856,6 @@ get_log_path()                                        *vim.lsp.get_log_path()*
     Return: ~
         (string) path to log file
 
-inlay_hint({bufnr}, {enable})                           *vim.lsp.inlay_hint()*
-    Enable/disable/toggle inlay hints for a buffer
-
-    Parameters: ~
-      • {bufnr}   (integer) Buffer handle, or 0 for current
-      • {enable}  (boolean|nil) true/false to enable/disable, nil to toggle
-
 omnifunc({findstart}, {base})                             *vim.lsp.omnifunc()*
     Implements 'omnifunc' compatible LSP completion.
 
@@ -1179,8 +1172,8 @@ declaration({options})                             *vim.lsp.buf.declaration()*
       • {options}  (table|nil) additional options
                    • reuse_win: (boolean) Jump to existing window if buffer is
                      already open.
-                   • on_list: (function) handler for list results. See
-                     |lsp-on-list-handler|
+                   • on_list: (function) |lsp-on-list-handler| replacing the
+                     default handler. Called for any non-empty result.
 
 definition({options})                               *vim.lsp.buf.definition()*
     Jumps to the definition of the symbol under the cursor.
@@ -1189,8 +1182,8 @@ definition({options})                               *vim.lsp.buf.definition()*
       • {options}  (table|nil) additional options
                    • reuse_win: (boolean) Jump to existing window if buffer is
                      already open.
-                   • on_list: (function) handler for list results. See
-                     |lsp-on-list-handler|
+                   • on_list: (function) |lsp-on-list-handler| replacing the
+                     default handler. Called for any non-empty result.
 
 document_highlight()                        *vim.lsp.buf.document_highlight()*
     Send request to the server to resolve document highlights for the current
@@ -1271,8 +1264,8 @@ implementation({options})                       *vim.lsp.buf.implementation()*
 
     Parameters: ~
       • {options}  (table|nil) additional options
-                   • on_list: (function) handler for list results. See
-                     |lsp-on-list-handler|
+                   • on_list: (function) |lsp-on-list-handler| replacing the
+                     default handler. Called for any non-empty result.
 
 incoming_calls()                                *vim.lsp.buf.incoming_calls()*
     Lists all the call sites of the symbol under the cursor in the |quickfix|
@@ -1329,8 +1322,8 @@ type_definition({options})                     *vim.lsp.buf.type_definition()*
       • {options}  (table|nil) additional options
                    • reuse_win: (boolean) Jump to existing window if buffer is
                      already open.
-                   • on_list: (function) handler for list results. See
-                     |lsp-on-list-handler|
+                   • on_list: (function) |lsp-on-list-handler| replacing the
+                     default handler. Called for any non-empty result.
 
 workspace_symbol({query}, {options})          *vim.lsp.buf.workspace_symbol()*
     Lists all symbols in the current workspace in the quickfix window.
@@ -1467,6 +1460,53 @@ save({lenses}, {bufnr}, {client_id})                 *vim.lsp.codelens.save()*
       • {lenses}     lsp.CodeLens[]|nil lenses to store
       • {bufnr}      (integer)
       • {client_id}  (integer)
+
+
+==============================================================================
+Lua module: vim.lsp.inlay_hint                                *lsp-inlay_hint*
+
+enable({bufnr}, {enable})                        *vim.lsp.inlay_hint.enable()*
+    Enable/disable/toggle inlay hints for a buffer
+
+    Parameters: ~
+      • {bufnr}   (integer|nil) Buffer handle, or 0 or nil for current
+      • {enable}  (boolean|nil) true/nil to enable, false to disable
+
+get({filter})                                       *vim.lsp.inlay_hint.get()*
+    Get the list of inlay hints, (optionally) restricted by buffer, client, or
+    range.
+
+    Example usage: >lua
+        local hint = vim.lsp.inlay_hint.get({ bufnr = 0 })[1] -- 0 for current buffer
+
+        local client = vim.lsp.get_client_by_id(hint.client_id)
+        resolved_hint = client.request_sync('inlayHint/resolve', hint.inlay_hint, 100, 0).result
+        vim.lsp.util.apply_text_edits(resolved_hint.textEdits, 0, client.encoding)
+
+        location = resolved_hint.label[1].location
+        client.request('textDocument/hover', {
+          textDocument = { uri = location.uri },
+          position = location.range.start,
+        })
+<
+
+    Parameters: ~
+      • {filter}  vim.lsp.inlay_hint.get.filter ? Optional filters |kwargs|:
+                  • bufnr (integer?): 0 for current buffer
+                  • range (lsp.Range?)
+
+    Return: ~
+        vim.lsp.inlay_hint.get.ret [] Each list item is a table with the following fields:
+        • bufnr (integer)
+        • client_id (integer)
+        • inlay_hint (lsp.InlayHint)
+
+is_enabled({bufnr})                          *vim.lsp.inlay_hint.is_enabled()*
+    Parameters: ~
+      • {bufnr}  (integer|nil) Buffer handle, or 0 or nil for current
+
+    Return: ~
+        (boolean)
 
 
 ==============================================================================

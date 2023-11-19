@@ -1,6 +1,3 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check
-// it. PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-
 // drawscreen.c: Code for updating all the windows on the screen.
 // This is the top level, drawline.c is the middle and grid.c/screen.c the lower level.
 
@@ -725,6 +722,7 @@ static void win_redr_bordertext(win_T *wp, VirtText vt, int col)
     if (text == NULL) {
       break;
     }
+    attr = hl_apply_winblend(wp, attr);
     col += grid_line_puts(col, text, -1, attr);
   }
 }
@@ -758,7 +756,8 @@ static void win_redr_border(win_T *wp)
   int *attrs = wp->w_float_config.border_attr;
 
   int *adj = wp->w_border_adj;
-  int irow = wp->w_height_inner + wp->w_winbar_height, icol = wp->w_width_inner;
+  int irow = wp->w_height_inner + wp->w_winbar_height;
+  int icol = wp->w_width_inner;
 
   if (adj[0]) {
     grid_line_start(grid, 0);
@@ -1577,8 +1576,6 @@ static void win_update(win_T *wp, DecorProviders *providers)
       }
     }
     if (mod_top != 0 && hasAnyFolding(wp)) {
-      linenr_T lnumt, lnumb;
-
       // A change in a line can cause lines above it to become folded or
       // unfolded.  Find the top most buffer line that may be affected.
       // If the line was previously folded and displayed, get the first
@@ -1589,8 +1586,8 @@ static void win_update(win_T *wp, DecorProviders *providers)
       // the line below it.  If there is no valid entry, use w_topline.
       // Find the first valid w_lines[] entry below mod_bot.  Set lnumb
       // to this line.  If there is no valid entry, use MAXLNUM.
-      lnumt = wp->w_topline;
-      lnumb = MAXLNUM;
+      linenr_T lnumt = wp->w_topline;
+      linenr_T lnumb = MAXLNUM;
       for (int i = 0; i < wp->w_lines_valid; i++) {
         if (wp->w_lines[i].wl_valid) {
           if (wp->w_lines[i].wl_lastlnum < mod_top) {
@@ -2560,7 +2557,7 @@ void win_draw_end(win_T *wp, int c1, int c2, bool draw_margin, int row, int endr
     // draw the sign column
     int count = wp->w_scwidth;
     if (count > 0) {
-      n = win_fill_end(wp, ' ', ' ', n, win_signcol_width(wp) * count, row,
+      n = win_fill_end(wp, ' ', ' ', n, SIGN_WIDTH * count, row,
                        endrow, win_hl_attr(wp, HLF_SC));
     }
     // draw the number column
@@ -2635,7 +2632,7 @@ int number_width(win_T *wp)
 
   // If 'signcolumn' is set to 'number' and there is a sign to display, then
   // the minimal width for the number column is 2.
-  if (n < 2 && (wp->w_buffer->b_signlist != NULL)
+  if (n < 2 && wp->w_buffer->b_signs_with_text
       && (*wp->w_p_scl == 'n' && *(wp->w_p_scl + 1) == 'u')) {
     n = 2;
   }
