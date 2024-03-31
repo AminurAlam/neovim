@@ -30,10 +30,6 @@
 //  changed (lines appended/deleted/changed) or when it is flushed it gets a
 //  positive number. Use mf_trans_del() to get the new number, before calling
 //  mf_get().
-//
-// "Mom, can we get ropes?"
-// "We have ropes at home."
-// Ropes at home:
 
 #include <assert.h>
 #include <errno.h>
@@ -1844,12 +1840,6 @@ colnr_T ml_get_len(linenr_T lnum)
   return ml_get_buf_len(curbuf, lnum);
 }
 
-/// @return  length (excluding the NUL) of the text after position "pos".
-colnr_T ml_get_pos_len(pos_T *pos)
-{
-  return ml_get_buf_len(curbuf, pos->lnum) - pos->col;
-}
-
 /// @return  length (excluding the NUL) of the given line in the given buffer.
 colnr_T ml_get_buf_len(buf_T *buf, linenr_T lnum)
 {
@@ -3455,13 +3445,11 @@ static char *findswapname(buf_T *buf, char **dirp, char *old_fname, bool *found_
 
           // If there is a SwapExists autocommand and we can handle the
           // response, trigger it.  It may return 0 to ask the user anyway.
-          if (choice == SEA_CHOICE_NONE
-              && swap_exists_action != SEA_NONE
-              && has_autocmd(EVENT_SWAPEXISTS, buf_fname, buf)) {
+          if (has_autocmd(EVENT_SWAPEXISTS, buf_fname, buf)) {
             choice = do_swapexists(buf, fname);
           }
 
-          if (choice == SEA_CHOICE_NONE && swap_exists_action == SEA_READONLY) {
+          if (choice == SEA_CHOICE_NONE) {
             // always open readonly.
             choice = SEA_CHOICE_READONLY;
           }
@@ -3469,7 +3457,7 @@ static char *findswapname(buf_T *buf, char **dirp, char *old_fname, bool *found_
           process_running = 0;  // Set by attention_message..swapfile_info.
           if (choice == SEA_CHOICE_NONE) {
             // Show info about the existing swapfile.
-            attention_message(buf, fname);
+            // attention_message(buf, fname);
 
             // We don't want a 'q' typed at the more-prompt
             // interrupt loading a file.
@@ -4143,7 +4131,7 @@ int dec(pos_T *lp)
   if (lp->col == MAXCOL) {
     // past end of line
     char *p = ml_get(lp->lnum);
-    lp->col = ml_get_len(lp->lnum);
+    lp->col = (colnr_T)strlen(p);
     lp->col -= utf_head_off(p, p + lp->col);
     return 0;
   }
@@ -4159,7 +4147,7 @@ int dec(pos_T *lp)
     // there is a prior line
     lp->lnum--;
     char *p = ml_get(lp->lnum);
-    lp->col = ml_get_len(lp->lnum);
+    lp->col = (colnr_T)strlen(p);
     lp->col -= utf_head_off(p, p + lp->col);
     return 1;
   }
