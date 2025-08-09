@@ -3336,37 +3336,7 @@ static void attention_message(buf_T *buf, char *fname, char *fhname, StringBuild
 {
   assert(buf->b_fname != NULL);
 
-  emsg(_("E325: ATTENTION"));
-  kv_printf(*msg, _("Found a swap file by the name \""));
-  kv_printf(*msg, "%s\"\n", fhname);
-  const time_t swap_mtime = swapfile_info(fname, msg);
-  kv_printf(*msg, (_("While opening file \"")));
-  kv_printf(*msg, "%s\"\n", buf->b_fname);
-  FileInfo file_info;
-  if (!os_fileinfo(buf->b_fname, &file_info)) {
-    kv_printf(*msg, _("      CANNOT BE FOUND"));
-  } else {
-    kv_printf(*msg, _("             dated: "));
-    time_t x = file_info.stat.st_mtim.tv_sec;
-    char ctime_buf[50];
-    kv_printf(*msg, "%s", os_ctime_r(&x, ctime_buf, sizeof(ctime_buf), true));
-    if (swap_mtime != 0 && x > swap_mtime) {
-      kv_printf(*msg, _("      NEWER than swap file!\n"));
-    }
-  }
-  // Some of these messages are long to allow translation to
-  // other languages.
-  kv_printf(*msg, _("\n(1) Another program may be editing the same file.  If this is"
-                    " the case,\n    be careful not to end up with two different"
-                    " instances of the same\n    file when making changes."
-                    "  Quit, or continue with caution.\n"));
-  kv_printf(*msg, _("(2) An edit session for this file crashed.\n"));
-  kv_printf(*msg, _("    If this is the case, use \":recover\" or \"nvim -r "));
-  kv_printf(*msg, "%s", buf->b_fname);
-  kv_printf(*msg, (_("\"\n    to recover the changes (see \":help recovery\").\n")));
-  kv_printf(*msg, _("    If you did this already, delete the swap file \""));
-  kv_printf(*msg, "%s", fname);
-  kv_printf(*msg, _("\"\n    to avoid this message.\n"));
+  emsg(_("E325: SWAPFILE FOUND"));
 }
 
 /// Trigger the SwapExists autocommands.
